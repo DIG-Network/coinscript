@@ -7,7 +7,8 @@
 import { PuzzleBuilder, variable } from '../builder';
 import { 
   withStateLayer, 
-  withSingletonLayer, 
+  withSingletonLayer,
+  createSingletonLauncher, 
   withOwnershipLayer, 
   withRoyaltyLayer, 
   withMetadataLayer, 
@@ -608,6 +609,9 @@ export interface CoinScriptCompilationResult {
   
   /** Additional puzzles (e.g., action puzzles for slot machine) */
   additionalPuzzles?: Record<string, PuzzleBuilder>;
+  
+  /** Inner puzzle (unwrapped CoinScript logic) when using decorators like @singleton */
+  innerPuzzle?: PuzzleBuilder;
   
   /** Metadata about the compilation */
   metadata?: {
@@ -1617,34 +1621,29 @@ class CodeGenerator {
     }
     
     // Check for decorator-based layers
+    let hasSingletonDecorator = false;
     if (this.coin.decorators) {
       for (const decorator of this.coin.decorators) {
         if (decorator.name === 'singleton') {
-          // Apply singleton layer
+          hasSingletonDecorator = true;
+          // Generate launcher ID
           launcherId = decorator.arguments.length > 0
             ? String(this.evaluateExpression(decorator.arguments[0]))
             : this.generateLauncherId();
           
-          innerPuzzle = withSingletonLayer(innerPuzzle, launcherId);
           result.metadata!.hasSingleton = true;
           result.metadata!.launcherId = launcherId;
           
           // Generate launcher puzzle for singleton
-          const launcherPuzzle = new PuzzleBuilder();
-          launcherPuzzle.comment('Singleton launcher puzzle');
-          
-          // Launcher creates the singleton with specific conditions
-          // It needs to create a coin with the singleton puzzle hash and odd amount
-          launcherPuzzle.withSolutionParams('singleton_puzzle_hash', 'amount');
-          // For now, use a comment to indicate the createCoin operation
-          // The actual implementation would need to handle Expression parameters
-          launcherPuzzle.comment('CREATE_COIN with singleton_puzzle_hash and amount');
-          launcherPuzzle.addCondition(51, 
-            variable('singleton_puzzle_hash'), 
-            variable('amount')
+          const launcherPuzzle = createSingletonLauncher(
+            '0x' + '0'.repeat(64), // placeholder puzzle hash
+            1 // placeholder amount
           );
           
           result.launcherPuzzle = launcherPuzzle;
+          
+          // We'll apply the singleton layer AFTER building the inner puzzle
+          // so we can output both separately
         }
       }
     }

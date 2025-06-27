@@ -45,3 +45,4 @@ temp/
 
 # Package files
 *.tgz 
+training/
