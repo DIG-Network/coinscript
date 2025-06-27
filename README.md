@@ -1,208 +1,256 @@
 # Chia Puzzle Framework
 
+> ⚠️ **DISCLAIMER**: This project is still a Work In Progress (WIP) and is not ready for production use. APIs may change, and some features may be incomplete or unstable.
+
 A TypeScript framework for building Chia blockchain puzzles with a fluent, type-safe API and CoinScript - a high-level language for Chia smart coins.
 
-## Overview
+## Table of Contents
 
-The Chia Puzzle Framework provides two ways to create Chia puzzles:
+- [Introduction to CoinScript](#introduction-to-coinscript)
+  - [Basic Examples](#basic-examples)
+  - [Syntax Reference](#coinscript-syntax-reference)
+- [PuzzleBuilder API](#puzzlebuilder-api)
+  - [Getting Started](#getting-started-with-puzzlebuilder)
+  - [Building Puzzles](#building-puzzles-with-puzzlebuilder)
+- [SolutionBuilder](#solutionbuilder)
+  - [Creating Solutions](#creating-solutions)
+- [TypeScript Tree Representation](#typescript-tree-representation)
 
-1. **CoinScript** - A Solidity-inspired high-level language that compiles to ChiaLisp
-2. **PuzzleBuilder API** - A fluent, type-safe TypeScript API for direct puzzle construction
+## Introduction to CoinScript
 
-Both approaches compile to efficient ChiaLisp code that runs on the Chia blockchain.
+CoinScript is a Solidity-inspired high-level language that compiles to ChiaLisp. It provides familiar syntax for developers coming from other blockchain ecosystems while generating efficient ChiaLisp code.
 
-## Installation
+### Basic Examples
 
-```bash
-npm install chia-puzzle-framework
-```
+#### Example 1: Hello World
 
-## Quick Start
-
-### Using CoinScript
+The simplest CoinScript program that accepts and returns conditions:
 
 ```javascript
-// payment.coins
-coin SimplePayment {
+// hello-world.coins
+coin HelloWorld {
+    action spend(bytes32 conditions) {
+        conditions;
+    }
+}
+```
+
+**ChiaLisp Output:**
+```lisp
+(mod (ACTION . PARAMS)
+  (if (= ACTION "spend")
+    (f PARAMS)
+    (x)
+  )
+)
+```
+
+#### Example 2: Basic Payment with Authorization
+
+A payment contract that requires signature verification:
+
+```javascript
+// secure-payment.coins
+coin SecurePayment {
     storage {
-        address owner = 0xabcd...;
+        address owner = "xch1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqm6ks6e8mvy";
     }
     
     action pay(address recipient, uint256 amount) {
-        require(msg.sender == owner);
+        require(msg.sender == owner, "Not authorized");
         send(recipient, amount);
     }
 }
 ```
 
+**ChiaLisp Output:**
+```lisp
+(mod (OWNER ACTION . PARAMS)
+  (defun-inline send (recipient amount)
+    (list (list 51 recipient amount))
+  )
+  
+  (if (= ACTION "pay")
+    (if (= (f PARAMS) OWNER)
+      (send (f (r PARAMS)) (f (r (r PARAMS))))
+      (x "Not authorized")
+    )
+    (x)
+  )
+)
+```
+
+#### Example 3: Stateful Token Contract
+
+A more complex example using state management and events:
+
 ```javascript
-import { compileCoinScript } from 'chia-puzzle-framework';
-
-// Compile CoinScript to ChiaLisp
-const puzzle = compileCoinScript(coinScriptSource);
-console.log(puzzle.serialize());
-```
-
-### Using PuzzleBuilder API
-
-```typescript
-import { createPuzzle, amount } from 'chia-puzzle-framework';
-
-// Simple payment puzzle
-const puzzle = createPuzzle()
-  .requireSignature(publicKey)
-  .createCoin(recipientPuzzleHash, amount)
-  .build();
-
-// Serialize to ChiaLisp
-console.log(puzzle.serialize());
-```
-
-## CoinScript
-
-CoinScript is a high-level language that compiles to ChiaLisp using the PuzzleBuilder API. It provides a Solidity-like syntax that's familiar to smart contract developers.
-
-### Basic Syntax
-
-```coinscript
-coin PaymentContract {
-  storage {
-    address owner = 0xabcd...;
-    uint256 balance = 0;
-  }
-  
-  action transfer(address to, uint256 amount) {
-    require(msg.sender == owner, "Only owner");
-    require(amount <= balance, "Insufficient balance");
-    
-    balance -= amount;
-    send(to, amount);
-    emit Transfer(msg.sender, to, amount);
-  }
-  
-  event Transfer(address from, address to, uint256 amount);
-}
-```
-
-### Layer System
-
-CoinScript supports all PuzzleBuilder layers through explicit declarations:
-
-```coinscript
-coin NFTContract {
-  // Layer declarations
-  layer singleton(launcherId: 0x1234...);
-  layer state();
-  layer ownership(owner: 0xabcd..., transferProgram: 0xdef0...);
-  layer royalty(address: 0x5678..., percentage: 5);
-  layer metadata(metadata: {name: "My NFT", uri: "https://..."});
-  layer notification(notificationId: "nft-updates");
-  layer transfer(transferProgram: 0x9abc...);
-  
-  // Rest of contract...
-}
-```
-
-### Data Types
-
-- `uint256` - Unsigned 256-bit integer
-- `address` - 32-byte address/puzzle hash
-- `bool` - Boolean value
-- `bytes32` - 32-byte value
-- `string` - String value
-- `mapping(KeyType => ValueType)` - Key-value mapping
-
-### Built-in Variables
-
-- `msg.sender` - The address sending the transaction
-- `msg.value` - The amount being sent
-- `this` - The current contract instance
-
-### Built-in Functions
-
-- `require(condition, message)` - Assert a condition
-- `send(address, amount)` - Send coins to an address
-- `emit EventName(args...)` - Emit an event (creates announcement)
-- `sha256(value)` - Compute SHA256 hash
-- `pubkey(value)` - Get public key
-
-### Decorators
-
-Decorators modify action behavior:
-
-- `@onlyAddress(address1, address2, ...)` - Restrict action to specific addresses
-- `@stateful` - Mark action as stateful (uses slot-machine pattern)
-
-Example:
-```coinscript
-@onlyAddress(owner)
-action transferOwnership(address newOwner) {
-  // Only owner can execute this
-}
-
-@stateful
-action updateCounter() {
-  state.counter += 1;  // State member access supported!
-}
-```
-
-### Stateful Coins (Slot-Machine Pattern)
-
-CoinScript now supports stateful coins using the slot-machine pattern:
-
-```coinscript
+// stateful-token.coins
 coin StatefulToken {
-    storage address admin = 0x...;
+    storage address admin = "xch1...";
     
-    // State block defines mutable state
     state {
         uint256 totalSupply;
         mapping(address => uint256) balances;
         bool paused;
     }
     
+    event Transfer(address from, address to, uint256 amount);
+    event Paused(bool status);
+    
     @stateful
     action mint(address to, uint256 amount) {
-        require(state.paused == false, "Contract is paused");
+        require(msg.sender == admin, "Only admin can mint");
+        require(!state.paused, "Contract is paused");
+        
         state.totalSupply += amount;
         state.balances[to] += amount;
+        
+        emit Transfer(address(0), to, amount);
+    }
+    
+    @stateful  
+    action transfer(address to, uint256 amount) {
+        require(!state.paused, "Contract is paused");
+        require(state.balances[msg.sender] >= amount, "Insufficient balance");
+        
+        state.balances[msg.sender] -= amount;
+        state.balances[to] += amount;
+        
+        emit Transfer(msg.sender, to, amount);
+    }
+    
+    @onlyAddress(admin)
+    action pause() {
+        state.paused = true;
+        emit Paused(true);
     }
 }
 ```
 
-Features:
-- State is hidden while coin is unspent
-- Actions compiled as separate puzzles with merkle tree
-- Runtime support with `StateManager` and `StatefulCoinManager`
-- Merkle proof generation using `merkletreejs`
+**ChiaLisp Output (Main Puzzle):**
+```lisp
+(mod (ADMIN STATE_HASH ACTION . PARAMS)
+  (include condition_codes.clib)
+  
+  (defun-inline calculate-action-hash (action state)
+    (sha256tree1 (c action state))
+  )
+  
+  (defun-inline verify-merkle-proof (leaf proof root)
+    ; Merkle verification logic
+    ...
+  )
+  
+  (defun create-state-coin (new-state)
+    (list
+      (list CREATE_COIN 
+        (sha256tree1 (c (f @) new-state))
+        1
+      )
+    )
+  )
+  
+  ; Main dispatch logic
+  (if (any (= ACTION "mint") (= ACTION "transfer") (= ACTION "pause"))
+    (if (verify-merkle-proof 
+          (calculate-action-hash ACTION STATE_HASH)
+          (f (r PARAMS))
+          (sha256tree1 ACTIONS_TREE))
+      (a (f PARAMS) (c STATE_HASH (r PARAMS)))
+      (x "Invalid action proof")
+    )
+    (x "Unknown action")
+  )
+)
+```
+
+## CoinScript Syntax Reference
+
+### Data Types
+
+- `uint256` - Unsigned 256-bit integer
+- `address` - 32-byte address/puzzle hash  
+- `bool` - Boolean value (true/false)
+- `bytes32` - 32-byte value
+- `string` - String value
+- `mapping(KeyType => ValueType)` - Key-value mapping
+
+### Storage Declaration
+
+Storage variables are immutable and curried into the puzzle:
+
+```javascript
+storage {
+    address owner = "xch1...";
+    uint256 maxSupply = 1000000;
+    bool transfersEnabled = true;
+}
+```
+
+### State Declaration
+
+State variables are mutable using the slot-machine pattern:
+
+```javascript
+state {
+    uint256 counter;
+    mapping(address => uint256) balances;
+}
+```
+
+### Actions
+
+Actions are the entry points to your contract:
+
+```javascript
+action transfer(address to, uint256 amount) {
+    // Action logic
+}
+
+// Default action (no name needed in solution)
+action default(bytes32 conditions) {
+    conditions;
+}
+```
+
+### Decorators
+
+Modify action behavior:
+
+```javascript
+@onlyAddress(owner, admin)  // Restrict to specific addresses
+@stateful                   // Enable state modifications
+action sensitiveOperation() {
+    // Protected logic
+}
+```
+
+### Built-in Variables
+
+- `msg.sender` - Address sending the transaction
+- `msg.value` - Amount being sent
+- `this` - Current contract instance
+
+### Built-in Functions
+
+- `require(condition, message)` - Assert condition or fail
+- `send(address, amount)` - Create coin with amount
+- `emit EventName(args...)` - Emit event (creates announcement)
+- `sha256(value)` - Compute SHA256 hash
+- `exception` or `exception("message")` - Fail with optional message
 
 ### Control Flow
 
-```coinscript
+```javascript
 if (condition) {
-  // statements
+    // statements
 } else if (otherCondition) {
-  // statements
+    // statements  
 } else {
-  // statements
+    // statements
 }
 ```
-
-### Exception Handling
-
-```coinscript
-// Fail with a descriptive message
-if (balance < requiredAmount) {
-    exception("Insufficient balance");
-}
-
-// Fail without a message
-if (address == 0x0) {
-    exception;
-}
-```
-
-The `exception` keyword compiles to ChiaLisp's `(x)` operator, causing immediate failure.
 
 ### Operators
 
@@ -211,222 +259,130 @@ The `exception` keyword compiles to ChiaLisp's `(x)` operator, causing immediate
 - Logical: `&&`, `||`, `!`
 - Assignment: `=`, `+=`, `-=`
 
-### Compiling CoinScript
+### Layer System
+
+Declare covenant layers:
 
 ```javascript
-const { compileCoinScript, parseCoinScriptFile } = require('chia-puzzle-framework');
+coin NFT {
+    layer singleton(launcherId: 0x1234...);
+    layer state();
+    layer ownership(owner: 0xabcd..., transferProgram: 0xdef0...);
+    layer royalty(address: 0x5678..., percentage: 5);
+    
+    // Contract logic...
+}
+```
 
-// From string
-const puzzle = compileCoinScript(`
-  coin SimplePayment {
-    action pay(address recipient) {
-      send(recipient, msg.value);
-    }
-  }
-`);
+## PuzzleBuilder API
 
-// From file
-const puzzle2 = parseCoinScriptFile('./contract.coins');
+The PuzzleBuilder provides a fluent, type-safe TypeScript API for constructing Chia puzzles directly.
+
+### Getting Started with PuzzleBuilder
+
+```typescript
+import { createPuzzle, expr, amount } from 'chia-puzzle-framework';
+
+// Simple payment puzzle
+const puzzle = createPuzzle()
+  .requireSignature(publicKey)
+  .createCoin(recipientPuzzleHash, amount)
+  .build();
 
 // Convert to ChiaLisp
-console.log(puzzle.toChiaLisp());
+console.log(puzzle.serialize({ indent: true }));
 ```
 
-### Multiple Puzzle Generation
+### Building Puzzles with PuzzleBuilder
 
-CoinScript can generate multiple puzzles when needed:
-
-```javascript
-const result = compileCoinScript(`
-  @singleton
-  coin NFT {
-    storage address owner = "xch1...";
-    
-    @stateful
-    action transfer(address newOwner) {
-      require(msg.sender == owner);
-      owner = newOwner;
-    }
-  }
-`);
-
-// Access different puzzles
-const mainPuzzle = result.mainPuzzle;          // The NFT logic
-const launcherPuzzle = result.launcherPuzzle;  // Creates the singleton
-const actionPuzzles = result.additionalPuzzles; // Stateful actions
-
-// Metadata about the compilation
-console.log(result.metadata); 
-// { coinName: 'NFT', hasSingleton: true, hasStatefulActions: true, ... }
-```
-
-See the [Multiple Puzzles Guide](docs/multiple-puzzles-guide.md) for details.
-
-## Key Features
-
-### 🔨 Fluent Builder API
-
-The `PuzzleBuilder` provides an intuitive, chainable API for constructing puzzles:
+#### Basic Operations
 
 ```typescript
 const puzzle = createPuzzle()
-  .if(amount.greaterThan(1000000))
-    .then(b => b
-      .createCoin(addr1, amount.divide(2))
-      .createCoin(addr2, amount.divide(2))
-    )
-    .else(b => b
-      .createCoin(addr3, amount)
-    )
+  // Coin creation
+  .createCoin(puzzleHash, 1000000)
+  .createCoin(puzzleHash2, amount.divide(2), "memo")
+  
+  // Signatures
+  .requireSignature(pubkey)
+  .requireMySignature(pubkey)
+  .requireSignatureUnsafe(pubkey, message)
+  
+  // Time locks
+  .requireAfterSeconds(3600)
+  .requireAfterHeight(1000000)
+  .requireBeforeSeconds(7200)
+  .requireBeforeHeight(2000000)
+  
+  // Fees
   .reserveFee(50)
+  
+  // Announcements
+  .createAnnouncement("hello")
+  .assertAnnouncement(announcementId)
+  
+  // Assertions
+  .assertMyPuzzleHash(hash)
+  .assertMyCoinId(coinId)
+  
   .build();
 ```
 
-### 🎯 Decorators for Access Control
+#### Expressions
 
-CoinScript now supports decorators to add metadata and behavior to actions:
-
-```coinscript
-@onlyAddress(owner, admin)
-action withdraw(address recipient, uint256 amount) {
-  require(amount > 0, "Invalid amount");
-  send(recipient, amount);
-}
-```
-
-The `@onlyAddress` decorator automatically generates validation logic to ensure only authorized addresses can execute the action.
-
-### 💾 Stateful Smart Coins
-
-Full support for stateful coins using the slot-machine pattern:
-
-```coinscript
-coin GameContract {
-    state {
-        uint256 score;
-        address winner;
-        mapping(address => uint256) playerScores;
-    }
-    
-    @stateful
-    action play(uint256 points) {
-        state.playerScores[msg.sender] += points;
-        if (state.playerScores[msg.sender] > state.score) {
-            state.score = state.playerScores[msg.sender];
-            state.winner = msg.sender;
-        }
-    }
-}
-```
-
-Features:
-- Hidden state until spend
-- Merkle tree of actions
-- State member access (`state.field`)
-- Runtime state management with merkle proofs
-
-### 🧮 Type-Safe Expressions
-
-Build complex calculations with the `Expression` class:
+Build complex calculations with type-safe expressions:
 
 ```typescript
+import { expr, amount } from 'chia-puzzle-framework';
+
 const fee = expr(50);
 const commission = amount.multiply(0.01); // 1% commission
-const netAmount = amount.subtract(fee).subtract(commission);
+const half = amount.divide(2);
+const total = amount.add(fee);
 
 const puzzle = createPuzzle()
-  .createCoin(recipient, netAmount)
-  .createCoin(feeCollector, commission)
+  .if(amount.greaterThan(1000000))
+    .then(b => b.createCoin(addr1, half))
+    .else(b => b.createCoin(addr2, amount))
+  .reserveFee(fee)
   .build();
 ```
 
-### 🔒 Built-in Security Patterns
-
-Common security patterns are built-in:
-
-```typescript
-// Time-locked payment
-const timeLocked = createPuzzle()
-  .requireAfterSeconds(3600) // 1 hour
-  .createCoin(recipient, amount)
-  .build();
-
-// Multi-signature
-const multiSig = createPuzzle()
-  .requireSignature(pubkey1)
-  .requireSignature(pubkey2)
-  .createCoin(recipient, amount)
-  .build();
-```
-
-### 🔄 Reusable Components
-
-Compose and reuse puzzle components:
-
-```typescript
-const authComponent = puzzle()
-  .requireSignature(authPubkey);
-
-const feeComponent = puzzle()
-  .reserveFee(50);
-
-const finalPuzzle = createPuzzle()
-  .merge(authComponent)
-  .merge(feeComponent)
-  .createCoin(recipient, amount)
-  .build();
-```
-
-## Common Patterns
-
-### Payment Puzzles
-
-```typescript
-// Pay to public key
-const p2pk = createPuzzle()
-  .payToPublicKey(publicKey)
-  .build();
-
-// Pay to conditions
-const p2c = createPuzzle()
-  .payToConditions()
-  .build();
-
-// Delegated puzzle
-const delegated = createPuzzle()
-  .delegatedPuzzle()
-  .build();
-```
-
-### Conditional Logic
+#### Control Flow
 
 ```typescript
 // If/else conditions
 const conditional = createPuzzle()
   .if(amount.greaterThan(threshold))
-    .then(b => b.createCoin(addrA, amount))
-    .else(b => b.createCoin(addrB, amount))
+    .then(b => b
+      .requireSignature(adminKey)
+      .createCoin(treasuryAddr, amount)
+    )
+    .else(b => b
+      .requireSignature(userKey)
+      .createCoin(userAddr, amount)
+    )
   .build();
 
 // Multiple conditions
 const multiCondition = createPuzzle()
-  .if(amount.greaterThan(highThreshold))
+  .if(amount.greaterThan(1000000))
     .then(b => b.requireSignature(adminKey))
-  .elseIf(amount.greaterThan(medThreshold), b => b
-    .requireSignature(userKey)
+  .elseIf(amount.greaterThan(100000), b => b
+    .requireSignature(moderatorKey)
   )
-  .else(b => b)
+  .else(b => b.requireSignature(userKey))
   .createCoin(recipient, amount)
   .build();
 ```
 
-### Loops and Iteration
+#### Loops and Iteration
 
 ```typescript
-// Split payment equally
+// Distribute to multiple recipients
 const recipients = [addr1, addr2, addr3, addr4];
 
-const splitPayment = createPuzzle()
+const distributor = createPuzzle()
   .forEach(recipients, (recipient, index, builder) => {
     builder.createCoin(recipient, amount.divide(recipients.length));
   })
@@ -434,290 +390,306 @@ const splitPayment = createPuzzle()
 
 // Repeat pattern
 const repeated = createPuzzle()
-  .repeat(3, (index, builder) => {
+  .repeat(5, (index, builder) => {
     builder.createCoin(`addr${index}`, 1000 * (index + 1));
   })
   .build();
 ```
 
-### Advanced Patterns
+#### Composition
 
 ```typescript
-// Escrow with timeout
-const escrow = createPuzzle()
-  .if(variable('released').equals(1))
-    .then(b => b
-      .requireSignature(sellerKey)
-      .createCoin(buyerAddr, amount)
-    )
-    .else(b => b
-      .requireAfterHeight(timeoutHeight)
-      .requireSignature(sellerKey)
-      .createCoin(sellerAddr, amount) // Refund
-    )
-  .build();
+// Reusable components
+const authComponent = puzzle()
+  .requireSignature(authPubkey)
+  .requireAfterHeight(100000);
 
-// Atomic swap
-const atomicSwap = createPuzzle()
-  .assertAnnouncement(swapCommitmentHash)
+const paymentComponent = puzzle()
   .createCoin(recipient, amount)
+  .reserveFee(50);
+
+// Merge components
+const finalPuzzle = createPuzzle()
+  .merge(authComponent)
+  .merge(paymentComponent)
   .build();
 ```
 
-## Layer Abstractions
-
-The framework provides built-in support for Chia's covenant layers:
-
-### CAT (Colored Coins) Layer
-```typescript
-// Fixed supply CAT (no minting/melting)
-const fixedSupplyCat = createPuzzle()
-  .createCoin(recipient, amount)
-  .withCATLayer(TAIL_PROGRAMS.NONE().toModHash());
-
-// CAT with minting authority
-const mintableCat = createPuzzle()
-  .createCoin(recipient, amount)
-  .withCATLayer(TAIL_PROGRAMS.EVERYTHING_WITH_SIGNATURE(pubkey).toModHash());
-
-// One-time mint from genesis coin
-const genesisCat = createPuzzle()
-  .createCoin(recipient, amount)
-  .withCATLayer(TAIL_PROGRAMS.GENESIS_BY_COIN_ID(genesisCoinId).toModHash());
-```
-
-### NFT Layers
-```typescript
-const nftPuzzle = createPuzzle()
-  .createCoin(recipient, 1)
-  .asNFT({
-    metadata: '{"name": "My NFT", "image": "ipfs://..."}',
-    metadataUpdaterPuzzleHash: '0x...',
-    currentOwner: '0x...',
-    royaltyAddress: '0x...',
-    tradePricePercentage: 500 // 5%
-  });
-```
-
-### Singleton Layer
-```typescript
-const singletonPuzzle = createPuzzle()
-  .createCoin(newState, 1) // Odd amount required
-  .withSingletonLayer(launcherId);
-```
-
-### Custom Layers
-```typescript
-const customLayer = createPuzzle()
-  .withLayer({
-    name: 'Rate Limiter',
-    modHash: '0x...',
-    curriedParams: { MAX_SPEND: 1000 },
-    solutionParams: ['current_amount']
-  });
-```
-
-## Layer System
-
-The framework provides a generic layer system for composing functionality:
-
-### Available Layers
-
-- **Singleton Layer**: Ensures coin uniqueness and trackability
-- **Ownership Layer**: Manages ownership and transfer rules  
-- **State Layer**: Maintains mutable state across spends
-- **Notification Layer**: Enables inter-coin communication
-- **Royalty Layer**: Enforces royalty payments on trades
-- **Metadata Layer**: Stores and manages structured metadata
-- **Action Layer**: Enables composable actions that modify state (based on slot-machine design)
-
-### Using Layers
-
-```javascript
-const { withSingletonLayer, withOwnershipLayer, applyLayers } = require('chia-puzzle-framework');
-
-// Apply individual layers
-const singletonPuzzle = withSingletonLayer(innerPuzzle, launcherId);
-
-// Compose multiple layers
-const nftPuzzle = applyLayers(innerPuzzle, {
-  singleton: { launcherId: '0x...' },
-  ownership: { owner: '0x...', royaltyAddress: '0x...' },
-  state: { initialState: { name: 'My NFT' } }
-});
-```
-
-### Pre-built Layer Patterns
-
-```javascript
-// Create a fully-featured NFT
-const nft = createLayeredNFT(innerPuzzle, {
-  launcherId: '0x...',
-  metadata: { name: 'Cool NFT', image: 'ipfs://...' },
-  owner: '0x...',
-  royaltyAddress: '0x...',
-  royaltyPercentage: 250 // 2.5%
-});
-
-// Create a DID
-const did = createLayeredDID(innerPuzzle, {
-  launcherId: '0x...',
-  recoveryDids: ['0x...', '0x...'],
-  numVerificationsRequired: 1
-});
-
-// Create a layered smart contract
-const contract = createLayeredContract(logic, {
-  singleton: true,
-  launcherId: '0x...',
-  hasState: true,
-  initialState: { totalSupply: 1000000 }
-});
-```
-
-## API Reference
-
-### PuzzleBuilder
-
-The main interface for building puzzles. See the [full API documentation](docs/puzzle-builder-guide.md).
-
-Key methods:
-- `createCoin(puzzleHash, amount)` - Create a coin
-- `requireSignature(pubkey)` - Require signature
-- `requireAfterSeconds(seconds)` - Time lock
-- `if(condition).then().else()` - Conditional logic
-- `forEach(items, callback)` - Iteration
-- `merge(other)` - Composition
-- `build()` - Build the puzzle
-- `serialize(options?)` - Convert to ChiaLisp
-
-### Serialization
-
-The framework generates proper ChiaLisp with formatting that matches official Chia puzzle conventions:
+#### Common Patterns
 
 ```typescript
-// Complex puzzle with includes and many parameters
-const catLikePuzzle = createPuzzle()
-  .includeConditionCodes()
-  .includeCurryAndTreehash()
+// Pay to delegated puzzle
+const delegated = createPuzzle()
+  .delegatedPuzzle()
+  .build();
+
+// Pay to conditions
+const p2c = createPuzzle()
+  .payToConditions()
+  .build();
+
+// Pay to public key
+const p2pk = createPuzzle()
+  .payToPublicKey(publicKey)
+  .build();
+```
+
+#### Mod Structure Support
+
+```typescript
+// Create a module with curried parameters
+const modulesPuzzle = createPuzzle()
+  .includeStandardLibraries()
   .withCurriedParams({
-    MOD_HASH: 'abcd' + '00'.repeat(30),
-    TAIL_PROGRAM_HASH: 'beef' + '00'.repeat(30),
-    INNER_PUZZLE: 'deadbeef'
+    OWNER: ownerPuzzleHash,
+    TIMEOUT: 3600,
+    FEE_ADDRESS: feeCollector
   })
-  .withSolutionParams('inner_solution', 'prev_coin_id', 'this_coin_info', 'extra_delta')
-  .assertMyCoinId(createPuzzle().param('this_coin_info'))
-  .createCoin(createPuzzle().param('INNER_PUZZLE'), createPuzzle().param('extra_delta'));
-
-// Formatted output matching ChiaLisp conventions
-console.log(catLikePuzzle.serialize({ indent: true }));
+  .withSolutionParams('recipient', 'amount')
+  .comment('Check owner authorization')
+  .requireSignature(puzzle().param('OWNER'))
+  .comment('Create payment with fee')
+  .createCoin(puzzle().param('recipient'), puzzle().param('amount').multiply(0.99))
+  .createCoin(puzzle().param('FEE_ADDRESS'), puzzle().param('amount').multiply(0.01))
+  .build();
 ```
 
-Output:
-```clojure
-(mod (
-    MOD_HASH                 ;; curried into puzzle
-    TAIL_PROGRAM_HASH        ;; curried into puzzle  
-    INNER_PUZZLE             ;; curried into puzzle
-    inner_solution    
-    prev_coin_id             
-    this_coin_info           ;; verified with ASSERT_MY_COIN_ID
-    extra_delta
-  )
+## SolutionBuilder
 
-  (include condition_codes.clvm)
-  (include curry-and-treehash.clinc)
-  (74 this_coin_info)
-  (51 INNER_PUZZLE extra_delta)
-)
-```
+The SolutionBuilder provides a fluent API for creating solutions (spending scripts) for puzzles.
 
-The serializer provides:
-- ChiaLisp-standard formatting matching official puzzles
-- Multi-line parameter lists with aligned comments
-- Proper grouping of include directives
-- Smart decisions about single vs multi-line formatting
-- Correct indentation for nested structures
+### Creating Solutions
 
-### Comments
-
-Add comments to make your puzzles more readable:
+#### Basic Solutions
 
 ```typescript
-const puzzle = createPuzzle()
-  .withSolutionParams('amount', 'recipient')
-  .blockComment('This puzzle demonstrates basic payment')
-  .blockComment('with signature verification')
-  .comment('Require signature from the puzzle owner')
-  .requireSignature('0xpubkey...')
-  .comment('Create the payment output')
-  .createCoin(
-    createPuzzle().param('recipient'), 
-    createPuzzle().param('amount')
-  );
+import { createSolution } from 'chia-puzzle-framework';
+
+// Simple solution with conditions
+const solution = createSolution()
+  .addConditions(conditions => {
+    conditions
+      .createCoin('0x' + '11'.repeat(32), 1000000)
+      .reserveFee(50)
+      .requireSignature('0xpubkey...');
+  })
+  .build();
 ```
 
-Output:
-```clojure
-(mod (amount recipient)
+#### Complex Solutions
 
-  ;; This puzzle demonstrates basic payment
-  ;; with signature verification
+```typescript
+// Solution with multiple parameters
+const solution = createSolution()
+  .add('transfer')  // Action name
+  .add('0xrecipient...')  // Recipient
+  .add(500000)  // Amount
+  .addList(builder => {
+    builder.add('metadata1');
+    builder.add('metadata2');
+  })
+  .build();
 
-  (
-    c
-    (50 0xpubkey... (sha256tree1 "1")) ;; Require signature from the puzzle owner
-    (c (51 recipient amount) ;; Create the payment output "()")
-  )
-)
+// Stateful solution
+const statefulSolution = createSolution()
+  .addAction('mint', ['0xrecipient...', 1000000])
+  .addState({
+    totalSupply: 1000000,
+    balances: new Map([
+      ['0xaddr1...', 500000],
+      ['0xaddr2...', 500000]
+    ]),
+    paused: false
+  })
+  .addMerkleProof([
+    '0xhash1...',
+    '0xhash2...',
+    '0xhash3...'
+  ])
+  .build();
 ```
 
-Types of comments:
-- `comment(text)` - Adds an inline comment to the next condition
-- `blockComment(text)` - Adds a standalone comment line before the body
-- `toModHash()` - Calculate SHA256 tree hash of the puzzle
+#### Solution Patterns
 
-### TAIL Programs
+```typescript
+// Delegated puzzle solution
+const delegatedSolution = createSolution()
+  .addDelegatedPuzzle(delegatedPuzzle, delegatedSolution)
+  .build();
 
-Built-in TAIL programs for CATs:
-- `TAIL_PROGRAMS.NONE()` - No minting/melting allowed (fixed supply)
-- `TAIL_PROGRAMS.EVERYTHING_WITH_SIGNATURE(pubkey)` - Mint/melt with signature
-- `TAIL_PROGRAMS.GENESIS_BY_COIN_ID(coinId)` - One-time mint from specific coin
-- `TAIL_PROGRAMS.DELEGATED_TAIL(innerPuzzle)` - Delegate to custom logic
+// Multiple outputs
+const multiOutput = createSolution()
+  .addConditions(c => {
+    c.createCoin(addr1, 300000)
+     .createCoin(addr2, 300000)
+     .createCoin(addr3, 350000)
+     .reserveFee(50000)
+     .createAnnouncement('batch payment complete');
+  })
+  .build();
 
-### Expression
+// Time-locked solution
+const timeLocked = createSolution()
+  .addConditions(c => {
+    c.requireAfterHeight(1000000)
+     .requireSignature(pubkey)
+     .createCoin(recipient, amount);
+  })
+  .build();
+```
 
-For building calculations and conditions:
+#### Serialization
 
-### State Management
+```typescript
+// Convert to ChiaLisp string
+const chialispStr = solution.serialize({ indent: true });
+console.log(chialispStr);
+// Output: ((51 0x1111... 1000000) (52 50))
 
-CoinScript distinguishes between two types of state:
+// Convert to hex for spend bundles
+const hexStr = solution.toHex();
+console.log(hexStr);
+// Output: 0xff8351ff821111...
+```
 
-1. **Storage Variables** - Immutable values that are part of the puzzle definition
-   ```coinscript
-   storage address admin = "xch1...";  // Cannot change
-   storage uint256 maxSupply = 1000000;
-   ```
+## TypeScript Tree Representation
 
-2. **State Variables** - Mutable values stored in the coin's memo
-   ```coinscript
-   state uint256 totalSupply = 0;  // Can be updated
-   state bool paused = false;
-   ```
+The framework represents ChiaLisp programs as a tree structure in memory, enabling easy manipulation and transformation before serialization.
 
-When spending a coin with state variables, the current state is read from the coin's memo, can be modified during the spend, and new coins are created with the updated state.
+### Core Types
 
-### Events
+```typescript
+// Base type for all tree nodes
+type TreeNode = Atom | List | Cons;
 
-Events in CoinScript compile directly to Chia coin announcements:
+// Single value node
+interface Atom {
+  type: 'atom';
+  value: number | bigint | Uint8Array | string | boolean | null;
+}
 
-```coinscript
-event Transfer(address from, address to, uint256 amount);
+// Proper list (nil-terminated)
+interface List {
+  type: 'list';
+  items: TreeNode[];
+}
 
-action transfer(address to, uint256 amount) {
-    // ... transfer logic ...
-    emit Transfer(msg.sender, to, amount);
+// Improper list (cons pair)
+interface Cons {
+  type: 'cons';
+  first: TreeNode;
+  rest: TreeNode;
 }
 ```
 
-The `emit` statement creates a coin announcement that can be observed by other coins or external systems.
+### Tree Construction
+
+```typescript
+import { list, atom, int, hex, sym } from 'chia-puzzle-framework';
+
+// Create atoms
+const numberAtom = int(42);
+const hexAtom = hex('0xdeadbeef');
+const symbolAtom = sym('CREATE_COIN');
+
+// Create lists
+const simpleList = list([int(51), hex('0x1234...'), int(1000)]);
+const nestedList = list([
+  sym('if'),
+  list([sym('='), sym('amount'), int(1000)]),
+  list([int(51), hex('0xaddr1...'), int(500)]),
+  list([int(51), hex('0xaddr2...'), int(1000)])
+]);
+```
+
+### Tree Transformation
+
+The framework transforms high-level constructs to ChiaLisp:
+
+1. **CoinScript Parse**: Text → AST
+2. **AST Transform**: AST → PuzzleBuilder calls
+3. **Builder Execution**: PuzzleBuilder → TreeNode structure
+4. **Serialization**: TreeNode → ChiaLisp text
+
+Example transformation:
+
+```typescript
+// CoinScript
+"send(recipient, 1000)"
+
+// AST
+{
+  type: 'function_call',
+  name: 'send',
+  args: [
+    { type: 'identifier', name: 'recipient' },
+    { type: 'number', value: 1000 }
+  ]
+}
+
+// PuzzleBuilder
+builder.createCoin(recipient, 1000)
+
+// TreeNode
+{
+  type: 'list',
+  items: [
+    { type: 'atom', value: 51 },  // CREATE_COIN opcode
+    { type: 'atom', value: 'recipient_puzzle_hash' },
+    { type: 'atom', value: 1000 }
+  ]
+}
+
+// ChiaLisp
+"(51 0xrecipient_puzzle_hash 1000)"
+```
+
+### Hashing and Validation
+
+```typescript
+import { sha256tree, serialize } from 'chia-puzzle-framework';
+
+// Calculate puzzle hash
+const puzzleHash = sha256tree(puzzleTree);
+
+// Serialize for network
+const serialized = serialize(puzzleTree, { 
+  indent: true,
+  useKeywords: true 
+});
+
+// Validate structure
+function validateTree(node: TreeNode): boolean {
+  if (isAtom(node)) {
+    return node.value !== undefined;
+  }
+  if (isList(node)) {
+    return node.items.every(validateTree);
+  }
+  if (isCons(node)) {
+    return validateTree(node.first) && validateTree(node.rest);
+  }
+  return false;
+}
+```
+
+### Memory Efficiency
+
+The tree representation is designed for efficiency:
+
+- **Shared Structure**: Common subtrees can be reused
+- **Lazy Evaluation**: Trees are built on-demand
+- **Type Safety**: TypeScript ensures valid structures at compile time
+- **Immutability**: Trees are immutable, enabling safe sharing
+
+## Contributing
+
+This project is under active development. Contributions, bug reports, and feature requests are welcome!
+
+## License
+
+[MIT License](LICENSE)
+
+---
+
+*Note: This framework is not affiliated with Chia Network Inc. Always test thoroughly on testnet before mainnet deployment.*
