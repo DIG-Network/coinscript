@@ -69,19 +69,38 @@ export function withSingletonLayer(
   // 3. Wrap CREATE_COIN conditions with singleton layer
   // 4. Ensure singleton properties are maintained
   
-  // For now, just return the conditions from running the inner puzzle
-  // (c first_condition (a INNER_PUZZLE inner_solution))
-  singleton.comment('Return singleton conditions with inner puzzle result');
+  // For now, we'll create a nested structure that properly separates the inner puzzle
+  // This is still simplified compared to the real singleton
+  singleton.comment('Return conditions from inner puzzle');
   
-  // Build the proper structure instead of using addCondition
-  // This is a simplified version - real singleton is more complex
-  // For now, just return inner puzzle conditions directly
-  singleton.returnValue(list([
-    sym('a'),  // apply operator
-    singleton.param('INNER_PUZZLE').tree,
-    singleton.param('inner_solution').tree
-  ]));
-
+  // In real singleton, this would be more complex with lineage verification
+  // For now, just delegate to inner puzzle
+  // The key is to NOT inline the inner puzzle code, but reference it as a parameter
+  
+  // This creates: (a INNER_PUZZLE inner_solution)
+  // where INNER_PUZZLE is curried in, not inlined
+  singleton.payToConditions(); // This will create (a (q . 2) 1) which runs conditions from solution
+  
+  // Actually we need to run the inner puzzle, not conditions
+  // Override the nodes to create the proper delegation
+  singleton['nodes'] = [];
+  singleton.delegatedPuzzle(); // Creates (a 2 3) - run puzzle from arg2 with solution arg3
+  
+  // But we need to use INNER_PUZZLE parameter, not arg2
+  // So we'll manually construct the correct expression
+  singleton['nodes'] = [
+    singleton.param('INNER_PUZZLE').tree,  // The inner puzzle (curried)
+    singleton.param('inner_solution').tree  // The solution for inner puzzle
+  ];
+  
+  // Actually, let's use the merge approach to properly construct this
+  const runner = puzzle();
+  runner.noMod();
+  // Create (a INNER_PUZZLE inner_solution)
+  runner.returnValue(`(a INNER_PUZZLE inner_solution)`);
+  
+  singleton.merge(runner);
+  
   return singleton;
 }
 
