@@ -1,0 +1,10 @@
+// Example 00: Hello World
+// The absolute simplest CoinScript coin - returns conditions from solution
+
+coin HelloWorld {
+    // Every coin needs at least one action to be spendable
+    action spend(bytes32 conditions) {
+        // Simply return whatever conditions are passed
+        conditions;
+    }
+} 

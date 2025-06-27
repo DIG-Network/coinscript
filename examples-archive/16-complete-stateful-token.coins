@@ -1,0 +1,135 @@
+// Complete stateful token using slot-machine pattern
+// This demonstrates true state management in CoinScript
+
+coin StatefulToken {
+    // Storage is curried into the puzzle (immutable)
+    storage address admin = 0x0000000000000000000000000000000000000000000000000000000000000001;
+    storage uint256 maxSupply = 1000000;
+    
+    // State is stored in the action layer (mutable via coin recreation)
+    state {
+        uint256 totalSupply;
+        mapping(address => uint256) balances;
+        bool paused;
+        address owner;
+    }
+    
+    // Events
+    event Transfer(address from, address to, uint256 amount);
+    event Mint(address to, uint256 amount);
+    event OwnershipTransferred(address oldOwner, address newOwner);
+    event Paused();
+    event Unpaused();
+    
+    // Constructor sets initial state
+    constructor(address initialOwner) {
+        state.owner = initialOwner;
+        state.paused = false;
+        state.totalSupply = 0;
+    }
+    
+    // Modifiers
+    modifier onlyOwner() {
+        require(msg.sender == state.owner, "Only owner");
+    }
+    
+    modifier whenNotPaused() {
+        require(!state.paused, "Contract paused");
+    }
+    
+    // Actions (automatically stateful due to state access)
+    @stateful
+    action transfer(address to, uint256 amount) whenNotPaused {
+        require(state.balances[msg.sender] >= amount, "Insufficient balance");
+        
+        state.balances[msg.sender] -= amount;
+        state.balances[to] += amount;
+        
+        emit Transfer(msg.sender, to, amount);
+    }
+    
+    @stateful
+    action mint(address to, uint256 amount) onlyOwner whenNotPaused {
+        require(state.totalSupply + amount <= maxSupply, "Exceeds max supply");
+        
+        state.totalSupply += amount;
+        state.balances[to] += amount;
+        
+        emit Mint(to, amount);
+    }
+    
+    @stateful
+    action burn(uint256 amount) whenNotPaused {
+        require(state.balances[msg.sender] >= amount, "Insufficient balance");
+        
+        state.balances[msg.sender] -= amount;
+        state.totalSupply -= amount;
+    }
+    
+    @stateful
+    action pause() onlyOwner {
+        require(!state.paused, "Already paused");
+        state.paused = true;
+        emit Paused();
+    }
+    
+    @stateful
+    action unpause() onlyOwner {
+        require(state.paused, "Not paused");
+        state.paused = false;
+        emit Unpaused();
+    }
+    
+    @stateful
+    action transferOwnership(address newOwner) onlyOwner {
+        require(newOwner != 0x0000000000000000000000000000000000000000000000000000000000000000, "Invalid address");
+        
+        address oldOwner = state.owner;
+        state.owner = newOwner;
+        
+        emit OwnershipTransferred(oldOwner, newOwner);
+    }
+    
+    // View functions (read-only, no state modification)
+    view balanceOf(address account) returns (uint256) {
+        return state.balances[account];
+    }
+    
+    view totalSupply() returns (uint256) {
+        return state.totalSupply;
+    }
+    
+    view owner() returns (address) {
+        return state.owner;
+    }
+    
+    view isPaused() returns (bool) {
+        return state.paused;
+    }
+}
+
+/*
+How this works under the hood:
+
+1. State Structure:
+   - State is encoded as a ChiaLisp list and curried into the action layer
+   - Each field has a fixed position in the state list
+   - Mappings are stored as association lists
+
+2. Action Execution:
+   - When spending, you provide the action name and parameters
+   - The action layer validates the action via merkle proof
+   - Action receives current state and returns new state
+   - Finalizer creates a new coin with updated state
+
+3. State Persistence:
+   - The coin is recreated with the same puzzle but new state
+   - State changes are atomic - all or nothing
+   - State history is preserved on-chain in spend records
+
+4. Benefits over traditional approaches:
+   - State is hidden until spent (privacy)
+   - Actions are upgradeable (change merkle root)
+   - Gas-efficient (only pay for state changes)
+   - Composable with other Chia primitives
+*/ 

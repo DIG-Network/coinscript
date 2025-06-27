@@ -1,0 +1,64 @@
+; exponential_premium.clsp by yakuhito
+;; Expired handles are auctioned off to prevent snipers. This program adds a premium to the
+;;   base price of a handle during the auction.
+
+;; This program returns the premium by approximating START_PREMIUM * 0.5^n,
+;;   where n is the number of days that have passed since the handle expired.
+;; Note that n is fractional - the premium after 1 hour should be START_PREMIUM * 0.5^(1/24).
+
+;; Inspired by ExponentialPremiumPirceOracle: https://github.com/ensdomains/ens-contracts/blob/master/contracts/ethregistrar/ExponentialPremiumPriceOracle.sol
+
+(mod (
+    BASE_PROGRAM ; compute base price using this program
+    HALVING_PERIOD ; one day = 86400 = 60 * 60 * 24 seconds
+    START_PREMIUM
+    END_VALUE ; premium at the very end of the expiry auction
+    PRECISION ; 10 ** 18
+    BITS_LIST ; (list bit1 bit2 bit3 ...)
+    Buy_Time  ; 'time now' - assumes user is interested in passing in a value as late as possible
+    Expiration . 
+    rest_of_pricing_program_solution ; pricing_program_solution passed to BASE_PROGRAM (r expiration handle . num_years) = (handle . num_years)
+)
+    (defun add_fractional_part (PRECISION bits_list acc fraction_part premium)
+        (if bits_list
+            (add_fractional_part
+                PRECISION
+                (r bits_list)
+                (lsh acc 1)
+                fraction_part
+                (if (logand fraction_part acc)
+                    (/ (* premium (f bits_list)) PRECISION)
+                    ; else
+                    premium
+                )
+            )
+            ; else
+            premium
+        )
+    )
+
+    ; if premium is lower than END_VALUE, auction's over
+    (defun correct_premium (premium END_VALUE)
+        (if (> premium END_VALUE) (- premium END_VALUE) 0)
+    )
+
+    (defun-inline main ((price_without_premium . registered_time))
+        (c
+            (+
+                price_without_premium
+                (correct_premium (add_fractional_part
+                   PRECISION
+                   BITS_LIST
+                   1
+                   (/ (* 65536 (% (- Buy_Time Expiration) HALVING_PERIOD)) HALVING_PERIOD) ; fractional part of n with 16 bits of precision (2 ** 16 = 65536)
+                   (/ START_PREMIUM (lsh 1 (/ (- Buy_Time Expiration) HALVING_PERIOD))) ; premium from whole periods = START_PREMIUM / 2^p
+                ) END_VALUE) ; premium
+            )
+            registered_time
+        )
+    )
+
+    (main
+        (a BASE_PROGRAM (c Expiration rest_of_pricing_program_solution))
+    )
+)

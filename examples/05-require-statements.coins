@@ -1,0 +1,55 @@
+// Example 05: Require Statements
+// Shows different validation patterns using require()
+
+coin RequireStatements {
+    storage {
+        address owner = "xch1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqm6ks6e8mvy";
+        address operator = "xch1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqm6ks6e8mvy";
+        uint256 minAmount = 100;
+        uint256 maxAmount = 10000;
+        uint256 dailyLimit = 50000;
+        bool paused = false;
+    }
+    
+    action withdraw(address to, uint256 amount, uint256 todayTotal) {
+        // 1. Simple ownership check
+        require(msg.sender == owner, "Not owner");
+        
+        // 2. Boolean flag check
+        require(!paused, "Contract is paused");
+        
+        // 3. Range validation
+        require(amount >= minAmount, "Amount too small");
+        require(amount <= maxAmount, "Amount too large");
+        
+        // 4. Complex condition with OR
+        require(
+            msg.sender == owner || msg.sender == operator,
+            "Not authorized"
+        );
+        
+        // 5. Mathematical validation
+        require(todayTotal + amount <= dailyLimit, "Daily limit exceeded");
+        
+        // 6. Address validation
+        require(
+            to != 0x0000000000000000000000000000000000000000000000000000000000000000,
+            "Invalid recipient"
+        );
+        
+        // 7. Multiple conditions with AND
+        require(
+            amount > 0 && amount <= msg.value,
+            "Invalid amount"
+        );
+        
+        // If all checks pass, execute the withdrawal
+        send(to, amount);
+    }
+    
+    // Require patterns:
+    // - Always fail early (require at the top)
+    // - Provide clear error messages
+    // - Check most likely failures first (gas optimization)
+    // - Group related checks together
+} 

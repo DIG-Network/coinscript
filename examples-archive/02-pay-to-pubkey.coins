@@ -1,0 +1,21 @@
+// Pay to Public Key
+// Standard Chia coin that requires a signature from a specific public key
+// The public key is baked into the puzzle hash for security
+
+coin PayToPubkey {
+    storage {
+        // The address that can spend this coin
+        // This will be curried into the puzzle, not provided at spend time
+        address AUTHORIZED_ADDRESS = "xch1kz49798988rn86rzf5wkuwr9kdnzzelpm7lyx6khn3rjjhz9xlnqvk0vwr";
+    }
+    
+    action spend(bytes32 conditions) {
+        // Require signature from the authorized address
+        // The AUTHORIZED_ADDRESS is a constant in the puzzle, not a parameter
+        require(msg.sender == AUTHORIZED_ADDRESS, "Unauthorized");
+        
+        // Return the conditions from the solution
+        // The signature will automatically cover sha256(conditions + coin_id)
+        conditions;
+    }
+} 

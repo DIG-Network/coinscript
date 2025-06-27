@@ -1,0 +1,61 @@
+// Example 06: Send Coins
+// Demonstrates the send() function for creating new coins
+
+coin SendCoins {
+    storage {
+        address treasury = "xch1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqm6ks6e8mvy";
+        uint256 treasuryFee = 10; // 10%
+    }
+    
+    // Basic send - creates a simple coin
+    action simpleSend(address recipient, uint256 amount) {
+        send(recipient, amount);
+        // That's it! Creates CREATE_COIN condition
+    }
+    
+    // Send with memo - includes metadata
+    action sendWithMemo(address recipient, uint256 amount, bytes32 memo) {
+        // Memo can be used for:
+        // - Transaction references
+        // - State data
+        // - Messages
+        send(recipient, amount, memo);
+    }
+    
+    // Multiple sends in one action
+    action multiSend(address recipient1, address recipient2, uint256 amount) {
+        // Split evenly between two recipients
+        half = amount / 2;
+        send(recipient1, half);
+        send(recipient2, half);
+    }
+    
+    // Send with fee deduction
+    action sendWithFee(address recipient, uint256 totalAmount) {
+        // Calculate fee
+        fee = (totalAmount * treasuryFee) / 100;
+        netAmount = totalAmount - fee;
+        
+        // Send to recipient and treasury
+        send(recipient, netAmount);
+        send(treasury, fee);
+        
+        // Note: Total sent must equal coin value
+    }
+    
+    // Conditional sends
+    action conditionalSend(address recipient, uint256 amount, bool urgent) {
+        if (urgent) {
+            // Urgent: send immediately
+            send(recipient, amount);
+        } else {
+            // Non-urgent: send most, keep some
+            reserve = amount / 10;
+            send(recipient, amount - reserve);
+            send(msg.sender, reserve); // Return change
+        }
+    }
+    
+    // Important: sum of all send amounts must equal coin's value
+    // Otherwise the spend will fail!
+} 

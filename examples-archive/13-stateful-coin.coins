@@ -1,0 +1,69 @@
+// Example of slot-machine style state management
+coin StatefulToken {
+    // These are curried into the puzzle (immutable)
+    storage address admin = 0x0000000000000000000000000000000000000000000000000000000000000001;
+    storage uint256 maxSupply = 1000000;
+    
+    // State structure that will be passed in solution
+    state {
+        uint256 totalSupply;
+        mapping(address => uint256) balances;
+        bool paused;
+    }
+    
+    // Events for state changes
+    event Transfer(address from, address to, uint256 amount);
+    event Minted(address to, uint256 amount);
+    event Paused();
+    event Unpaused();
+    
+    // Actions receive current state and return new state
+    @stateful
+    @onlyAddress(admin)
+    action mint(address to, uint256 amount) {
+        require(!state.paused, "Contract is paused");
+        require(state.totalSupply + amount <= maxSupply, "Exceeds max supply");
+        
+        // Update state
+        state.totalSupply += amount;
+        state.balances[to] += amount;
+        
+        emit Minted(to, amount);
+        
+        // Return new state (implicit)
+    }
+    
+    @stateful
+    action transfer(address from, address to, uint256 amount) {
+        require(!state.paused, "Contract is paused");
+        require(state.balances[from] >= amount, "Insufficient balance");
+        require(msg.sender == from, "Not authorized");
+        
+        // Update state
+        state.balances[from] -= amount;
+        state.balances[to] += amount;
+        
+        emit Transfer(from, to, amount);
+    }
+    
+    @stateful
+    @onlyAddress(admin)
+    action pause() {
+        require(!state.paused, "Already paused");
+        state.paused = true;
+        emit Paused();
+    }
+    
+    @stateful  
+    @onlyAddress(admin)
+    action unpause() {
+        require(state.paused, "Not paused");
+        state.paused = false;
+        emit Unpaused();
+    }
+    
+    // Read-only action (doesn't modify state)
+    action getBalance(address account) view returns (uint256) {
+        return state.balances[account];
+    }
+} 

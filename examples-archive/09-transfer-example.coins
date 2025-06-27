@@ -1,0 +1,42 @@
+// Example showing send with optional memo
+coin TransferExample {
+    storage address treasury = "xch1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqm6ks6e8mvy";
+    
+    // State that will be passed via memo
+    state uint256 totalTransferred = 0;
+    state uint256 lastTransferTime = 0;
+    
+    event TokenTransfer(address to, uint256 amount);
+    event TransferWithMemo(address to, uint256 amount, bytes32 memo);
+    
+    // Send creates a simple coin without memo
+    action sendFunds(address to, uint256 amount) {
+        require(amount > 0, "Amount must be positive");
+        send(to, amount);
+        emit TokenTransfer(to, amount);
+    }
+    
+    // Send can include memo data (useful for passing state)
+    action sendWithState(address to, uint256 amount) {
+        require(amount > 0, "Amount must be positive");
+        
+        // Update state
+        totalTransferred += amount;
+        lastTransferTime = 1735776000;
+        
+        // Send with memo containing updated state
+        send(to, amount, 0x7374617465);
+        
+        emit TransferWithMemo(to, amount, 0x7374617465);
+    }
+    
+    // Send to treasury with tracking
+    action sendToTreasury(uint256 amount) {
+        require(amount > 0, "Amount must be positive");
+        
+        // Send with memo for tracking
+        send(treasury, amount, 0x74726561737572795f6465706f736974);
+        
+        emit TransferWithMemo(treasury, amount, 0x74726561737572795f6465706f736974);
+    }
+} 

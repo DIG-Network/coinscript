@@ -1,0 +1,13 @@
+// Basic Payment Coin
+// The simplest possible Chia coin with a spend function
+// Accepts conditions from the solution and returns them
+
+coin BasicPayment {
+    // No storage needed for basic payment
+    
+    action spend(bytes32 conditions) {
+        // Simply return the conditions passed in the solution
+        // This generates: (mod (conditions) conditions)
+        conditions;
+    }
+}

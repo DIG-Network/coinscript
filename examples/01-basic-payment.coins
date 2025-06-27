@@ -1,0 +1,13 @@
+// Example 01: Basic Payment
+// Introduces the 'default' action which doesn't require an action name in the solution
+
+coin BasicPayment {
+    // The 'default' action runs when no action name is specified
+    action default(bytes32 conditions) {
+        // Anyone can spend this coin by providing conditions
+        conditions;
+    }
+    
+    // Note: 'default' is special - it doesn't need ACTION parameter
+    // This makes the coin simpler to spend
+} 

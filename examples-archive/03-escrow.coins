@@ -1,0 +1,47 @@
+// Escrow Coin
+// Multi-party escrow with multiple spend paths
+// Can be released by seller, refunded to buyer, or arbitrated
+
+coin Escrow {
+    storage {
+        // Participants - using proper Chia addresses
+        address buyer = "xch1xf23pd3ludh8chksgaxcs6dkhcwpfm0gv64h02q9rmy6mwwp8w7qtsp7ph";
+        address seller = "xch1y7q2p8hs6z3xthxn8gvzpfupqzx8u3mm3kng6h8q4rmy6mwwp8w7q5678ex";
+        address arbiter = "xch1z8r3t9ks7a4yuhyn9hczqguqrzx9v4nn4lng7j9r5ny7nxxq9x8q2arbtr";
+        
+        // Escrow amount
+        uint256 amount = 1000000000; // 1 XCH in mojos
+        
+        // Timelock for auto-refund (unix timestamp)
+        uint256 refund_time = 1735776000; // 48 hours from creation
+    }
+    
+    // Seller can claim funds after delivering goods/services
+    action spendBySeller() {
+        require(msg.sender == seller, "Only seller can claim");
+        send(seller, amount);
+    }
+    
+    // Buyer can reclaim funds after timeout
+    action spendByBuyer() {
+        require(msg.sender == buyer, "Only buyer can refund");
+        require(block.timestamp >= refund_time, "Refund period not reached");
+        send(buyer, amount);
+    }
+    
+    // Arbiter can decide the outcome in case of dispute
+    action spendByArbiter(address recipient, uint256 recipient_amount) {
+        require(msg.sender == arbiter, "Only arbiter can decide");
+        
+        // Arbiter can split funds or send to either party
+        require(recipient_amount <= amount, "Amount exceeds escrow");
+        
+        // Release funds to recipient
+        send(recipient, amount);
+        
+        // Send remainder back to buyer if any
+        if (recipient_amount < amount) {
+            send(buyer, amount - recipient_amount);
+        }
+    }
+} 

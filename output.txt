@@ -1,0 +1,57 @@
+=== Singleton NFT with Launcher ===
+
+Compilation Result:
+──────────────────────────────────────────────────
+Main puzzle: ✓
+Launcher puzzle: ✓
+Metadata: {
+  "coinName": "SingletonNFT",
+  "hasSingleton": true,
+  "hasStatefulActions": false,
+  "launcherId": "0x8e71d684e7a14633d26fa32e7ce2e1fc552c294a9595e4920fff0f711ed49c1f"
+}
+
+Main Puzzle (Singleton NFT):
+──────────────────────────────────────────────────
+(mod
+  (inner_solution lineage_proof ACTION)
+  (include condition_codes.clvm)
+  (include curry-and-treehash.clinc)
+  (c
+    (73 1)
+    ;; Singleton layer ensures uniqueness ( c ( 2 (mod @ "()" ) inner_solution ) ( c ( i (= ACTION transfer) ( c ( assert (= sender "0x000000000000000000000000000000000000000000000000000000000000dead") ) ( c ( i (> "500" "0") (51 0x1234567890123456789012345678901234567890123456789012345678901234 1000) "()" ) (c (60 0x000a000e) "()") ) ) ( i (= ACTION updateMetadata) ( c ( assert (= sender "0x000000000000000000000000000000000000000000000000000000000000dead") ) (c (60 0x0000da0000da00) "()") ) (x) ) ) "()" ) ) ) )
+  )
+)
+
+Launcher Puzzle:
+──────────────────────────────────────────────────
+(mod
+  (singleton_puzzle_hash amount)
+  (51 singleton_puzzle_hash amount)
+  ;; CREATE_COIN with singleton_puzzle_hash and amount )
+)
+
+Launcher Usage:
+──────────────────────────────────────────────────
+The launcher puzzle is used to create the singleton:
+1. Calculate the main puzzle hash
+2. Create a solution with (singleton_puzzle_hash amount)
+3. Spend a genesis coin with the launcher puzzle
+4. This creates the singleton with a unique ID
+
+Deployment Process:
+──────────────────────────────────────────────────
+1. Deploy launcher to a temporary coin
+2. Calculate singleton puzzle hash from main puzzle
+3. Spend launcher with solution: (puzzle_hash 1)
+4. Singleton NFT is created with unique launcher ID
+5. All future spends use the main puzzle
+
+Benefits of Singleton Pattern:
+──────────────────────────────────────────────────
+• Guaranteed uniqueness - only one instance can exist
+• Trackable lineage - can trace history through spends
+• Standard pattern - works with wallets and explorers
+• Used for NFTs, DIDs, and unique assets
+
+✅ Singleton with launcher generation complete!

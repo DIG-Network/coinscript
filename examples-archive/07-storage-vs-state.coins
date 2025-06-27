@@ -1,0 +1,80 @@
+// Storage vs State Example
+// Demonstrates the difference between immutable storage (curried) and mutable state (in memo)
+
+coin StorageVsState {
+    // Storage: immutable values curried into the puzzle hash
+    storage {
+        // This address is baked into the puzzle and cannot change
+        address ADMIN = "xch1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqm6ks6e8mvy";
+        // Configuration that never changes
+        uint256 MAX_SUPPLY = 1000000;
+        uint256 CREATION_TIME = 1234567890;
+    }
+    
+    // State: mutable values stored in coin memo/hints
+    state {
+        // Current supply can change as tokens are minted
+        uint256 currentSupply = 0;
+        // Owner can be transferred
+        address currentOwner = "xch1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqm6ks6e8mvy";
+        // Paused state can be toggled
+        bool isPaused = false;
+    }
+    
+    // Default action - just spend normally
+    action default(bytes32 conditions) {
+        // Anyone can spend with default action if not paused
+        require(!isPaused, "Contract is paused");
+        conditions;
+    }
+    
+    // Mint new tokens
+    action mint(uint256 amount, bytes32 conditions) {
+        // Only admin can mint (immutable check)
+        require(msg.sender == ADMIN, "Only admin can mint");
+        
+        // Check against max supply (immutable value)
+        require(currentSupply + amount <= MAX_SUPPLY, "Exceeds max supply");
+        
+        // Check not paused (mutable state)
+        require(!isPaused, "Contract is paused");
+        
+        // Update state - this would create a new coin with updated currentSupply
+        // currentSupply += amount;
+        
+        emit TokensMinted(amount, currentSupply + amount);
+        
+        conditions;
+    }
+    
+    // Transfer ownership
+    action transfer_ownership(address newOwner, bytes32 conditions) {
+        // Only current owner can transfer (mutable state check)
+        require(msg.sender == currentOwner, "Only owner can transfer");
+        
+        // Update state - this would create a new coin with updated currentOwner
+        // currentOwner = newOwner;
+        
+        emit OwnershipTransferred(currentOwner, newOwner);
+        
+        conditions;
+    }
+    
+    // Pause/unpause
+    action toggle_pause(bytes32 conditions) {
+        // Only admin can pause (immutable check)
+        require(msg.sender == ADMIN, "Only admin can pause");
+        
+        // Toggle state - this would create a new coin with updated isPaused
+        // isPaused = !isPaused;
+        
+        emit PauseToggled(!isPaused);
+        
+        conditions;
+    }
+    
+    // Events
+    event TokensMinted(uint256 amount, uint256 newSupply);
+    event OwnershipTransferred(address from, address to);
+    event PauseToggled(bool newState);
+} 

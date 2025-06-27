@@ -1,0 +1,42 @@
+// Example showing the difference between send and transfer
+coin TransferExample {
+    storage address treasury = "xch1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqm6ks6e8mvy";
+    
+    // State that will be passed via memo
+    state uint256 totalTransferred = 0;
+    state uint256 lastTransferTime = 0;
+    
+    event Transfer(address to, uint256 amount);
+    event TransferWithMemo(address to, uint256 amount, string memo);
+    
+    // Send creates a simple coin without memo
+    action sendFunds(address to, uint256 amount) {
+        require(amount > 0, "Amount must be positive");
+        send to, amount;
+        emit Transfer(to, amount);
+    }
+    
+    // Transfer can include memo data (useful for passing state)
+    action transferWithState(address to, uint256 amount) {
+        require(amount > 0, "Amount must be positive");
+        
+        // Update state
+        totalTransferred += amount;
+        lastTransferTime = block.timestamp;
+        
+        // Transfer with memo containing updated state
+        transfer to, amount, "state_update";
+        
+        emit TransferWithMemo(to, amount, "state_update");
+    }
+    
+    // Transfer to treasury with tracking
+    action transferToTreasury(uint256 amount) {
+        require(amount > 0, "Amount must be positive");
+        
+        // Transfer with memo for tracking
+        transfer treasury, amount, "treasury_deposit";
+        
+        emit TransferWithMemo(treasury, amount, "treasury_deposit");
+    }
+}

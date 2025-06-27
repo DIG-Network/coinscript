@@ -1,0 +1,34 @@
+// Example demonstrating state visibility patterns
+coin StateVisibilityDemo {
+    // This is curried into puzzle - affects puzzle hash
+    storage uint256 version = 1;
+    
+    // These would be passed via solution - doesn't affect puzzle hash
+    state uint256 counter = 0;
+    state mapping(address => uint256) balances;
+    
+    event StateUpdated(uint256 oldCounter, uint256 newCounter);
+    event BalanceUpdated(address account, uint256 oldBalance, uint256 newBalance);
+    
+    // State passed in solution - hidden until spent
+    action incrementCounter(uint256 currentCounter) {
+        require(currentCounter == counter, "State mismatch");
+        
+        uint256 newCounter = currentCounter + 1;
+        emit StateUpdated(currentCounter, newCounter);
+        
+        // In real implementation, new state would be passed to next coin
+        // via solution parameters, not stored in puzzle
+    }
+    
+    // Demonstration of balance tracking
+    action updateBalance(
+        address account, 
+        uint256 currentBalance,
+        uint256 newBalance
+    ) {
+        emit BalanceUpdated(account, currentBalance, newBalance);
+        
+        // State would be reconstructed from solution history
+    }
+} 

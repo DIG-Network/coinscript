@@ -1,0 +1,40 @@
+// Example showing state visibility through memo field
+coin MemoStateExample {
+    storage address owner = 0x0000000000000000000000000000000000000000000000000000000000000001;
+    
+    // State that will be visible via memo
+    state uint256 publicCounter = 0;
+    state string lastAction = "";
+    
+    event StateUpdate(uint256 newCounter, string action);
+    
+    // Action that stores state in memo (visible before spend)
+    action incrementWithMemo(uint256 currentCounter) {
+        require(currentCounter == publicCounter, "Counter mismatch");
+        
+        uint256 newCounter = currentCounter + 1;
+        
+        // Create next coin with state in memo - VISIBLE IMMEDIATELY
+        send(this, 1, encodeState(newCounter, "increment"));
+        
+        emit StateUpdate(newCounter, "increment");
+    }
+    
+    // Action that passes state in solution (hidden until spend)
+    action incrementHidden(uint256 currentCounter) {
+        require(currentCounter == publicCounter, "Counter mismatch");
+        
+        uint256 newCounter = currentCounter + 1;
+        
+        // Create next coin without memo - state passed in next solution
+        send(this, 1);
+        
+        emit StateUpdate(newCounter, "increment_hidden");
+    }
+    
+    // Helper to encode state for memo
+    function encodeState(uint256 counter, string memory action) returns (bytes32) {
+        // In real implementation, would properly encode state
+        return bytes32(counter);
+    }
+} 

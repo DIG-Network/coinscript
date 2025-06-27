@@ -1,0 +1,65 @@
+// Example 07: Events
+// Shows how to use events for logging and announcements
+
+coin Events {
+    storage {
+        address owner = "xch1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqm6ks6e8mvy";
+        uint256 version = 1;
+    }
+    
+    // Events are declared at coin level
+    event Transfer(address from, address to, uint256 amount);
+    event OwnershipTransferred(address previousOwner, address newOwner);
+    event StateChanged(string key, uint256 oldValue, uint256 newValue);
+    event MultiDataEvent(
+        address indexed user,
+        uint256 timestamp,
+        string action,
+        bytes32 dataHash
+    );
+    
+    action transfer(address to, uint256 amount) {
+        // Emit a simple event
+        emit Transfer(msg.sender, to, amount);
+        
+        // Events become CREATE_PUZZLE_ANNOUNCEMENT conditions
+        send(to, amount);
+    }
+    
+    action changeOwner(address newOwner) {
+        require(msg.sender == owner, "Not owner");
+        
+        // Emit event with old and new values
+        emit OwnershipTransferred(owner, newOwner);
+        
+        // In real implementation, would update owner
+        conditions;
+    }
+    
+    action updateState(string key, uint256 newValue) {
+        // Example: tracking state changes
+        uint256 oldValue = 42; // Would come from actual state
+        
+        emit StateChanged(key, oldValue, newValue);
+        
+        conditions;
+    }
+    
+    action complexAction(uint256 timestamp, string actionType, bytes32 data) {
+        // Emit event with multiple parameters
+        emit MultiDataEvent(
+            msg.sender,    // who
+            timestamp,     // when
+            actionType,    // what
+            data          // additional data
+        );
+        
+        conditions;
+    }
+    
+    // Events are useful for:
+    // - Off-chain indexing
+    // - Transaction history
+    // - Debugging
+    // - Inter-coin communication
+} 
