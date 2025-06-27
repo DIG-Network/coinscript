@@ -1,0 +1,118 @@
+digraph CoinScriptAST {
+  rankdir=TB;
+  node [shape=box, style=filled, fillcolor=lightblue];
+  edge [fontsize=10];
+
+  subgraph cluster_CoinDeclaration {
+    label="CoinDeclaration";
+    style=rounded;
+    "coin-declaration" [label="Coin: VisualizationDemo"];
+  }
+
+  subgraph cluster_ConstantDeclaration {
+    label="ConstantDeclaration";
+    style=rounded;
+    "constant-0" [label="Const: FEE"];
+  }
+
+  subgraph cluster_Literal {
+    label="Literal";
+    style=rounded;
+    "constant-0-value" [label="Literal: 100"];
+    "action-0-stmt-0-condition-right" [label="Literal: 0"];
+  }
+
+  subgraph cluster_FunctionDeclaration {
+    label="FunctionDeclaration";
+    style=rounded;
+    "function-0" [label="Function: calculateTotal"];
+  }
+
+  subgraph cluster_Parameter {
+    label="Parameter";
+    style=rounded;
+    "function-0-param-0" [label="Param: amount"];
+    "action-0-param-0" [label="Param: recipient"];
+    "action-0-param-1" [label="Param: amount"];
+  }
+
+  subgraph cluster_ReturnStatement {
+    label="ReturnStatement";
+    style=rounded;
+    "function-0-stmt-0" [label="Return Statement"];
+  }
+
+  subgraph cluster_BinaryExpression {
+    label="BinaryExpression";
+    style=rounded;
+    "function-0-stmt-0-value" [label="Binary: +"];
+    "action-0-stmt-0-condition" [label="Binary: >"];
+  }
+
+  subgraph cluster_Identifier {
+    label="Identifier";
+    style=rounded;
+    "function-0-stmt-0-value-left" [label="ID: amount"];
+    "function-0-stmt-0-value-right" [label="ID: FEE"];
+    "action-0-stmt-0-condition-left" [label="ID: amount"];
+    "action-0-stmt-1-target" [label="ID: total"];
+    "action-0-stmt-1-value-callee" [label="ID: calculateTotal"];
+    "action-0-stmt-1-value-arg-0" [label="ID: amount"];
+    "action-0-stmt-2-recipient" [label="ID: recipient"];
+    "action-0-stmt-2-amount" [label="ID: total"];
+  }
+
+  subgraph cluster_ActionDeclaration {
+    label="ActionDeclaration";
+    style=rounded;
+    "action-0" [label="Action: pay"];
+  }
+
+  subgraph cluster_RequireStatement {
+    label="RequireStatement";
+    style=rounded;
+    "action-0-stmt-0" [label="Require Statement"];
+  }
+
+  subgraph cluster_AssignmentStatement {
+    label="AssignmentStatement";
+    style=rounded;
+    "action-0-stmt-1" [label="Assignment Statement"];
+  }
+
+  subgraph cluster_CallExpression {
+    label="CallExpression";
+    style=rounded;
+    "action-0-stmt-1-value" [label="Call: calculateTotal"];
+  }
+
+  subgraph cluster_SendStatement {
+    label="SendStatement";
+    style=rounded;
+    "action-0-stmt-2" [label="Send Statement"];
+  }
+
+  "coin-declaration" -> "constant-0" [label="Has Constant"];
+  "constant-0" -> "constant-0-value" [label="Has Value"];
+  "coin-declaration" -> "function-0" [label="Has Function"];
+  "function-0" -> "function-0-param-0" [label="Has Parameter"];
+  "function-0-stmt-0-value" -> "function-0-stmt-0-value-left" [label="Has Left Operand"];
+  "function-0-stmt-0-value" -> "function-0-stmt-0-value-right" [label="Has Right Operand"];
+  "function-0-stmt-0" -> "function-0-stmt-0-value" [label="Has Value"];
+  "function-0" -> "function-0-stmt-0" [label="Has Statement"];
+  "coin-declaration" -> "action-0" [label="Has Action"];
+  "action-0" -> "action-0-param-0" [label="Has Parameter"];
+  "action-0" -> "action-0-param-1" [label="Has Parameter"];
+  "action-0-stmt-0-condition" -> "action-0-stmt-0-condition-left" [label="Has Left Operand"];
+  "action-0-stmt-0-condition" -> "action-0-stmt-0-condition-right" [label="Has Right Operand"];
+  "action-0-stmt-0" -> "action-0-stmt-0-condition" [label="Has Condition"];
+  "action-0" -> "action-0-stmt-0" [label="Has Statement"];
+  "action-0-stmt-1" -> "action-0-stmt-1-target" [label="Has Target"];
+  "action-0-stmt-1-value" -> "action-0-stmt-1-value-callee" [label="Has Callee"];
+  "action-0-stmt-1-value" -> "action-0-stmt-1-value-arg-0" [label="Has Argument"];
+  "action-0-stmt-1" -> "action-0-stmt-1-value" [label="Has Value"];
+  "action-0" -> "action-0-stmt-1" [label="Has Statement"];
+  "action-0-stmt-2" -> "action-0-stmt-2-recipient" [label="Has Recipient"];
+  "action-0-stmt-2" -> "action-0-stmt-2-amount" [label="Has Amount"];
+  "action-0" -> "action-0-stmt-2" [label="Has Statement"];
+}

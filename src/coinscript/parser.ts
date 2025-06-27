@@ -4,7 +4,7 @@
  * Parses CoinScript syntax and compiles to PuzzleBuilder objects
  */
 
-import { PuzzleBuilder, variable } from '../builder';
+import { PuzzleBuilder, variable, expr } from '../builder';
 import { 
   withStateLayer, 
   withSingletonLayer,
@@ -15,10 +15,11 @@ import {
   withNotificationLayer, 
   withTransferProgramLayer,
   withActionLayer,
-  withSlotMachineLayer
+  withSlotMachineLayer,
+  createSingletonTemplate
 } from '../layers';
 import { Expression as PuzzleExpression } from '../builder/PuzzleBuilder';
-import { sha256tree, list, int } from '../core';
+import { sha256tree, list, int, sym, NIL, TreeNode, Atom, List } from '../core';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import { addressToPuzzleHash } from '@dignetwork/datalayer-driver';
@@ -47,6 +48,10 @@ enum TokenType {
   NOTIFICATION = 'NOTIFICATION',
   TRANSFER = 'TRANSFER',
   ACTIONLAYER = 'ACTIONLAYER',
+  CONST = 'CONST',
+  FUNCTION = 'FUNCTION',
+  INLINE = 'INLINE',
+  RETURN = 'RETURN',
   
   // Types
   UINT256 = 'UINT256',
@@ -372,6 +377,10 @@ class Tokenizer {
       'notification': TokenType.NOTIFICATION,
       'transfer': TokenType.TRANSFER,
       'actionlayer': TokenType.ACTIONLAYER,
+      'const': TokenType.CONST,
+      'function': TokenType.FUNCTION,
+      'inline': TokenType.INLINE,
+      'return': TokenType.RETURN,
       'uint256': TokenType.UINT256,
       'address': TokenType.ADDRESS,
       'bool': TokenType.BOOL,
@@ -440,6 +449,8 @@ interface CoinDeclaration extends ASTNode {
   state?: StateVariable[];
   stateBlock?: StateBlock;
   constructor?: Constructor;
+  constants?: ConstantDeclaration[];
+  functions?: FunctionDeclaration[];
   actions: ActionDeclaration[];
   events: EventDeclaration[];
   decorators?: Decorator[];
@@ -483,6 +494,21 @@ interface EventDeclaration extends ASTNode {
   type: 'EventDeclaration';
   name: string;
   parameters: Parameter[];
+}
+
+interface ConstantDeclaration extends ASTNode {
+  type: 'ConstantDeclaration';
+  name: string;
+  value: Expression;
+}
+
+interface FunctionDeclaration extends ASTNode {
+  type: 'FunctionDeclaration';
+  name: string;
+  parameters: Parameter[];
+  returnType?: string;
+  body: Statement[];
+  isInline?: boolean;
 }
 
 interface Parameter extends ASTNode {
@@ -536,6 +562,11 @@ interface AssignmentStatement extends Statement {
 interface ExpressionStatement extends Statement {
   type: 'ExpressionStatement';
   expression: Expression;
+}
+
+interface ReturnStatement extends Statement {
+  type: 'ReturnStatement';
+  value?: Expression;
 }
 
 interface Expression extends ASTNode {
@@ -613,11 +644,15 @@ export interface CoinScriptCompilationResult {
   /** Inner puzzle (unwrapped CoinScript logic) when using decorators like @singleton */
   innerPuzzle?: PuzzleBuilder;
   
+  /** All puzzles in order (inner to outer) for serialization */
+  allPuzzles?: PuzzleBuilder[];
+  
   /** Metadata about the compilation */
   metadata?: {
     coinName: string;
     hasSingleton: boolean;
     hasStatefulActions: boolean;
+    hasInnerPuzzleActions: boolean;
     launcherId?: string;
   };
 }
@@ -699,6 +734,12 @@ class Parser {
         }
       } else if (this.match(TokenType.CONSTRUCTOR)) {
         coin.constructor = this.parseConstructor();
+      } else if (this.match(TokenType.CONST)) {
+        if (!coin.constants) coin.constants = [];
+        coin.constants.push(this.parseConstantDeclaration());
+      } else if (this.match(TokenType.FUNCTION) || this.match(TokenType.INLINE)) {
+        if (!coin.functions) coin.functions = [];
+        coin.functions.push(this.parseFunctionDeclaration());
       } else if (this.match(TokenType.ACTION)) {
         coin.actions.push(this.parseActionDeclaration());
       } else if (this.match(TokenType.EVENT)) {
@@ -904,6 +945,70 @@ class Parser {
     return event;
   }
   
+  private parseConstantDeclaration(): ConstantDeclaration {
+    const name = this.expect(TokenType.IDENTIFIER);
+    this.expect(TokenType.ASSIGN);
+    const value = this.parseExpression();
+    this.expect(TokenType.SEMICOLON);
+    
+    return {
+      type: 'ConstantDeclaration',
+      name: name.value,
+      value,
+      line: name.line,
+      column: name.column
+    };
+  }
+  
+  private parseFunctionDeclaration(): FunctionDeclaration {
+    let isInline = false;
+    
+    // Check for optional inline modifier
+    if (this.previous().type === TokenType.INLINE) {
+      isInline = true;
+      // We already consumed INLINE, now consume FUNCTION
+      this.expect(TokenType.FUNCTION);
+    } else {
+      // We consumed FUNCTION already, but it wasn't inline
+      isInline = false;
+    }
+    
+    const name = this.expect(TokenType.IDENTIFIER);
+    
+    const func: FunctionDeclaration = {
+      type: 'FunctionDeclaration',
+      name: name.value,
+      parameters: [],
+      body: [],
+      isInline,
+      line: name.line,
+      column: name.column
+    };
+    
+    this.expect(TokenType.LPAREN);
+    
+    if (!this.check(TokenType.RPAREN)) {
+      func.parameters = this.parseParameterList();
+    }
+    
+    this.expect(TokenType.RPAREN);
+    
+    // Optional return type
+    if (this.match(TokenType.ARROW)) {
+      func.returnType = this.parseDataType();
+    }
+    
+    this.expect(TokenType.LBRACE);
+    
+    while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
+      func.body.push(this.parseStatement());
+    }
+    
+    this.expect(TokenType.RBRACE);
+    
+    return func;
+  }
+  
   private parseParameterList(): Parameter[] {
     const parameters: Parameter[] = [];
     
@@ -942,6 +1047,17 @@ class Parser {
     
     if (this.match(TokenType.IF)) {
       return this.parseIfStatement();
+    }
+    
+    if (this.match(TokenType.RETURN)) {
+      return this.parseReturnStatement();
+    }
+    
+    // Check for type keywords that indicate a variable declaration
+    if (this.check(TokenType.UINT256) || this.check(TokenType.ADDRESS) || 
+        this.check(TokenType.BOOL) || this.check(TokenType.BYTES32) || 
+        this.check(TokenType.STRING_TYPE)) {
+      return this.parseVariableDeclaration();
     }
     
     // Try to parse assignment or expression statement
@@ -1118,6 +1234,54 @@ class Parser {
     }
     
     return statement;
+  }
+  
+  private parseReturnStatement(): ReturnStatement {
+    const startToken = this.previous();
+    
+    const statement: ReturnStatement = {
+      type: 'ReturnStatement',
+      line: startToken.line,
+      column: startToken.column
+    };
+    
+    // Check if there's a return value (not semicolon or end of file)
+    if (!this.check(TokenType.SEMICOLON) && !this.isAtEnd()) {
+      statement.value = this.parseExpression();
+    }
+    
+    this.expect(TokenType.SEMICOLON);
+    
+    return statement;
+  }
+  
+  private parseVariableDeclaration(): Statement {
+    this.parseDataType(); // Parse and discard type info for now
+    const name = this.expect(TokenType.IDENTIFIER);
+    
+    this.expect(TokenType.ASSIGN);
+    const value = this.parseExpression();
+    this.expect(TokenType.SEMICOLON);
+    
+    // For now, treat variable declarations as assignments
+    // In a complete implementation, we'd track local variables separately
+    const identifier: Identifier = {
+      type: 'Identifier',
+      name: name.value,
+      line: name.line,
+      column: name.column
+    };
+    
+    const assignment: AssignmentStatement = {
+      type: 'AssignmentStatement',
+      target: identifier,
+      operator: '=',
+      value,
+      line: name.line,
+      column: name.column
+    };
+    
+    return assignment;
   }
   
   private parseExpression(): Expression {
@@ -1541,6 +1705,10 @@ class Parser {
 class CodeGenerator {
   private coin: CoinDeclaration;
   private storageValues: Map<string, unknown> = new Map(); // Track storage variable values
+  // private _localVariables: Map<string, PuzzleExpression | string | number> = new Map(); // Track local variables - for future use
+  private functionDefinitions: Map<string, FunctionDeclaration> = new Map(); // Track function definitions
+  private _functionNodes: TreeNode[] = []; // Store compiled function nodes
+  private _constantNodes: TreeNode[] = []; // Store compiled constant nodes
   
   constructor(coin: CoinDeclaration) {
     this.coin = coin;
@@ -1556,19 +1724,27 @@ class CodeGenerator {
       metadata: {
         coinName: this.coin.name,
         hasSingleton: false,
-        hasStatefulActions: false
+        hasStatefulActions: false,
+        hasInnerPuzzleActions: false
       }
     };
     
     // Track if we need to generate additional puzzles
     let launcherId: string | undefined;
     const additionalPuzzles: Record<string, PuzzleBuilder> = {};
+    const allPuzzles: PuzzleBuilder[] = [];
     
     // Check if we have any stateful actions
     const hasStatefulActions = this.coin.actions.some(action => 
       action.decorators?.some(d => d.name === 'stateful')
     );
     result.metadata!.hasStatefulActions = hasStatefulActions;
+    
+    // Check if we have any inner puzzle actions
+    const hasInnerPuzzleActions = this.coin.actions.some(action => 
+      action.decorators?.some(d => d.name === 'inner_puzzle')
+    );
+    result.metadata!.hasInnerPuzzleActions = hasInnerPuzzleActions;
     
     // Check if we have a state block
     const hasStateBlock = !!this.coin.stateBlock;
@@ -1583,6 +1759,32 @@ class CodeGenerator {
         // Store the value for later reference in expression generation
         this.storageValues.set(variable.name, value);
       }
+    }
+    
+    // Process constants
+    if (this.coin.constants) {
+      for (const constant of this.coin.constants) {
+        const value = this.evaluateLiteral(constant.value);
+        this.storageValues.set(constant.name, value);
+        
+        // Generate defconstant node
+        this._constantNodes.push(this.generateConstantNode(constant.name, value));
+      }
+    }
+    
+    // Process functions
+    if (this.coin.functions) {
+      for (const func of this.coin.functions) {
+        this.generateFunction(innerPuzzle, func);
+      }
+    }
+    
+    // Now generate the actual function nodes and add them to the puzzle tree
+    if (this.functionDefinitions.size > 0) {
+      // Store function nodes for later use in puzzle generation
+      this._functionNodes = Array.from(this.functionDefinitions.values()).map(f => 
+        this.generateFunctionNode(f)
+      );
     }
     
     // Process state variables (mutable, stored in coin memo)
@@ -1652,10 +1854,13 @@ class CodeGenerator {
     if (this.coin.actions.length > 0) {
       // Check if we have a default action
       const defaultAction = this.coin.actions.find(a => a.name === 'default');
-      const otherActions = this.coin.actions.filter(a => a.name !== 'default');
+              const otherActions = this.coin.actions.filter(a => 
+          a.name !== 'default' && 
+          !a.decorators?.some(d => d.name === 'inner_puzzle')
+        );
       
-      if (this.coin.actions.length === 1 && defaultAction) {
-        // Only a default action - generate it directly without ACTION parameter
+      if (this.coin.actions.length === 1 && defaultAction && !hasInnerPuzzleActions) {
+        // Only a default action and no inner puzzles - generate it directly without ACTION parameter
         const action = defaultAction;
         
         // Add solution parameters from the default action
@@ -1695,47 +1900,123 @@ class CodeGenerator {
           innerPuzzle = innerPuzzle.withSolutionParams(...constructorParams);
         }
         
+        // If we have inner puzzle actions, add parameters for them
+        if (hasInnerPuzzleActions) {
+          const innerPuzzleActions = this.coin.actions.filter(a => 
+            a.decorators?.some(d => d.name === 'inner_puzzle')
+          );
+          const innerPuzzleParams = innerPuzzleActions.map(a => `${a.name}_puzzle`);
+          innerPuzzle = innerPuzzle.withSolutionParams(...innerPuzzleParams);
+        }
+        
         // Build action routing logic
         innerPuzzle.comment('Action routing');
         
         // Build nested if-else chain for action routing
-        const buildActionChain = (actions: ActionDeclaration[], index: number, builder: PuzzleBuilder): void => {
-          if (index >= actions.length) {
-            // Handle the case when all actions have been exhausted
-            if (defaultAction) {
-              builder.comment('Default action');
-              for (const stmt of defaultAction.body) {
-                CodeGenerator.generateStatementStatic(builder, stmt, this.storageValues);
+                  // Add condition codes library if needed for main puzzle
+          let needsConditionCodes = false;
+          
+          // Check all non-inner_puzzle actions in the main routing logic
+          for (const action of otherActions) {
+            for (const stmt of action.body) {
+              if (stmt.type === 'SendStatement' || stmt.type === 'EmitStatement') {
+                needsConditionCodes = true;
+                break;
               }
-              const hasReturn = defaultAction.body.some(stmt => 
-                stmt.type === 'ExpressionStatement' && 
-                (stmt as ExpressionStatement).expression.type === 'Identifier' &&
-                ((stmt as ExpressionStatement).expression as Identifier).name === 'conditions'
-              );
-              if (!hasReturn && defaultAction.body.length === 0) {
-                builder.returnConditions();
-              }
-            } else {
-              // No default action - fail for unknown action
-              builder.fail("Unknown action");
             }
-            return;
+            if (needsConditionCodes) break;
           }
           
-          const action = actions[index];
-          
-          builder.if(variable('ACTION').equals(variable(action.name)))
-            .then(b => {
-              b.comment(`Action: ${action.name}`);
-              
-              // Check if this is a stateful action
-              const isStateful = action.decorators?.some(d => d.name === 'stateful') || false;
-              
-              // If stateful, add state as solution parameter
-              if (isStateful) {
-                b.comment('Stateful action - receiving current state');
-                b.withSolutionParams('current_state');
+          // Also check the default action if it exists
+          if (defaultAction) {
+            for (const stmt of defaultAction.body) {
+              if (stmt.type === 'SendStatement' || stmt.type === 'EmitStatement') {
+                needsConditionCodes = true;
+                break;
               }
+            }
+          }
+          
+          if (needsConditionCodes) {
+            innerPuzzle.includeConditionCodes();
+          }
+          
+          const buildActionChain = (actions: ActionDeclaration[], index: number, builder: PuzzleBuilder): void => {
+            if (index >= actions.length) {
+              // Handle the case when all actions have been exhausted
+              if (defaultAction) {
+                builder.comment('Default action');
+                for (const stmt of defaultAction.body) {
+                  CodeGenerator.generateStatementStatic(builder, stmt, this.storageValues);
+                }
+                const hasReturn = defaultAction.body.some(stmt => 
+                  stmt.type === 'ExpressionStatement' && 
+                  (stmt as ExpressionStatement).expression.type === 'Identifier' &&
+                  ((stmt as ExpressionStatement).expression as Identifier).name === 'conditions'
+                );
+                if (!hasReturn && defaultAction.body.length === 0) {
+                  builder.returnConditions();
+                }
+              } else {
+                // No default action - fail for unknown action
+                builder.fail("Unknown action");
+              }
+              return;
+            }
+            
+            const action = actions[index];
+            
+            builder.if(variable('ACTION').equals(variable(action.name)))
+              .then(b => {
+                b.comment(`Action: ${action.name}`);
+                
+                // Check if this is an inner puzzle action
+                const isInnerPuzzle = action.decorators?.some(d => d.name === 'inner_puzzle') || false;
+                
+                if (isInnerPuzzle) {
+                  // Route to inner puzzle
+                  b.comment(`Apply inner puzzle: ${action.name}`);
+                  
+                  // Get the action parameters
+                  const actionParams = action.parameters.map(p => p.name);
+                  if (actionParams.length > 0) {
+                    b.withSolutionParams(...actionParams);
+                  }
+                  
+                  // Apply the inner puzzle with the action parameters
+                  const puzzleParam = variable(`${action.name}_puzzle`);
+                  
+                  // Build the argument list for the inner puzzle
+                  if (actionParams.length > 0) {
+                    // Create a list of the parameters
+                    const paramList = actionParams.reduce((acc, param, index) => {
+                      if (index === 0) {
+                        return variable(param);
+                      }
+                      // Build nested cons cells for multiple params
+                      return expr(list([int(4), variable(param).tree, acc.tree]));
+                    }, variable(actionParams[0]));
+                    
+                    // Apply the puzzle with parameters: (a puzzle_param param_list)
+                    const applyExpr = expr(list([sym('a'), puzzleParam.tree, paramList.tree]));
+                    b.returnValue(applyExpr);
+                  } else {
+                    // Apply with empty list: (a puzzle_param ())
+                    const applyExpr = expr(list([sym('a'), puzzleParam.tree, NIL]));
+                    b.returnValue(applyExpr);
+                  }
+                  
+                  return; // Skip regular action processing
+                }
+                
+                // Check if this is a stateful action
+                const isStateful = action.decorators?.some(d => d.name === 'stateful') || false;
+                
+                // If stateful, add state as solution parameter
+                if (isStateful) {
+                  b.comment('Stateful action - receiving current state');
+                  b.withSolutionParams('current_state');
+                }
               
               // Handle decorators for access control
               if (action.decorators && action.decorators.length > 0) {
@@ -1773,7 +2054,7 @@ class CodeGenerator {
               
               // Generate action body
               for (const stmt of action.body) {
-                CodeGenerator.generateStatementStatic(b, stmt, this.storageValues);
+                CodeGenerator.generateStatementStatic(b, stmt, this.storageValues, undefined, undefined, this.functionDefinitions);
               }
               
               // If stateful, create the next coin with updated state
@@ -1814,9 +2095,9 @@ class CodeGenerator {
           buildActionChain(otherActions, 0, innerPuzzle);
         }
         
-        // If there are no other actions but we have a default action, just generate it
-        if (otherActions.length === 0 && defaultAction) {
-          // Generate default action directly
+        // If there are no other actions but we have a default action
+        if (otherActions.length === 0 && defaultAction && !hasInnerPuzzleActions) {
+          // No inner puzzle actions - generate default action directly
           for (const stmt of defaultAction.body) {
             CodeGenerator.generateStatementStatic(innerPuzzle, stmt, this.storageValues);
           }
@@ -1831,6 +2112,84 @@ class CodeGenerator {
           if (!hasReturn && defaultAction.body.length === 0) {
             innerPuzzle.returnConditions();
           }
+        }
+        
+        // Handle mixed actions - need to also handle @inner_puzzle actions in the main routing
+        const innerPuzzleActions = this.coin.actions.filter(a => 
+          a.decorators?.some(d => d.name === 'inner_puzzle')
+        );
+        
+        // If we have inner puzzle actions, we need routing logic (with or without default)
+        if (hasInnerPuzzleActions && otherActions.length === 0) {
+          innerPuzzle.comment('Routing to inner puzzles');
+          
+          // Parameters are already added above in the hasInnerPuzzleActions check
+          
+          const buildInnerPuzzleChain = (actions: ActionDeclaration[], index: number, builder: PuzzleBuilder): void => {
+            if (index >= actions.length) {
+              // No matching action found - use default if available
+              if (defaultAction) {
+                builder.comment('Default action');
+                for (const stmt of defaultAction.body) {
+                  CodeGenerator.generateStatementStatic(builder, stmt, this.storageValues);
+                }
+                const hasReturn = defaultAction.body.some(stmt => 
+                  stmt.type === 'ExpressionStatement' && 
+                  (stmt as ExpressionStatement).expression.type === 'Identifier' &&
+                  ((stmt as ExpressionStatement).expression as Identifier).name === 'conditions'
+                );
+                if (!hasReturn && defaultAction.body.length === 0) {
+                  builder.returnConditions();
+                }
+              } else {
+                builder.fail("Unknown action");
+              }
+              return;
+            }
+            
+            const action = actions[index];
+            
+            builder.if(variable('ACTION').equals(variable(action.name)))
+              .then(b => {
+                b.comment(`Apply inner puzzle: ${action.name}`);
+                
+                // Get the action parameters
+                const actionParams = action.parameters.map(p => p.name);
+                if (actionParams.length > 0) {
+                  b.withSolutionParams(...actionParams);
+                }
+                
+                // Apply the inner puzzle with the action parameters
+                // Using 'a' (apply) to run the curried inner puzzle
+                const puzzleParam = variable(`${action.name}_puzzle`);
+                
+                // Build the argument list for the inner puzzle
+                if (actionParams.length > 0) {
+                  // Create a list of the parameters
+                  const paramList = actionParams.reduce((acc, param, index) => {
+                    if (index === 0) {
+                      return variable(param);
+                    }
+                    // Build nested cons cells for multiple params
+                    return expr(list([int(4), variable(param).tree, acc.tree]));
+                  }, variable(actionParams[0]));
+                  
+                  // Apply the puzzle with parameters: (a puzzle_param param_list)
+                  const applyExpr = expr(list([sym('a'), puzzleParam.tree, paramList.tree]));
+                  b.returnValue(applyExpr);
+                } else {
+                  // Apply with empty list: (a puzzle_param ())
+                  const applyExpr = expr(list([sym('a'), puzzleParam.tree, NIL]));
+                  b.returnValue(applyExpr);
+                }
+              })
+              .else(b => {
+                // Recursively build the rest of the chain
+                buildInnerPuzzleChain(actions, index + 1, b);
+              });
+          };
+          
+          buildInnerPuzzleChain(innerPuzzleActions, 0, innerPuzzle);
         }
       } else {
         // Old behavior for single non-default spend action (backwards compatibility)
@@ -1890,8 +2249,24 @@ class CodeGenerator {
     // Don't automatically wrap in singleton - let the user decide
     // This allows creation of standard coins, CATs, NFTs, etc.
     
-    // Update the main puzzle in result
-    result.mainPuzzle = innerPuzzle;
+    // Handle @singleton decorator if present
+    if (hasSingletonDecorator && launcherId) {
+      // Store the inner puzzle (unwrapped CoinScript logic)
+      result.innerPuzzle = innerPuzzle;
+      
+      // Apply singleton layer to create the wrapped puzzle
+      const singletonPuzzle = withSingletonLayer(innerPuzzle, launcherId);
+      result.mainPuzzle = singletonPuzzle;
+      
+      // Also add the singleton template to show the structure
+      result.additionalPuzzles = result.additionalPuzzles || {};
+      result.additionalPuzzles['singleton_template'] = createSingletonTemplate();
+      
+      // The launcher puzzle was already created above
+    } else {
+      // No singleton decorator - main puzzle is the inner puzzle
+      result.mainPuzzle = innerPuzzle;
+    }
     
     // Add stateful action puzzles if any
     if (hasStatefulActions) {
@@ -1904,6 +2279,52 @@ class CodeGenerator {
       if (Object.keys(additionalPuzzles).length > 0) {
         result.additionalPuzzles = additionalPuzzles;
       }
+    }
+    
+    // Add inner puzzle action puzzles if any
+    if (hasInnerPuzzleActions) {
+      for (const action of this.coin.actions) {
+        if (action.decorators?.some(d => d.name === 'inner_puzzle')) {
+          const actionPuzzle = this.generateActionPuzzle(action);
+          additionalPuzzles[`action_${action.name}`] = actionPuzzle;
+          allPuzzles.push(actionPuzzle);
+        }
+      }
+      if (Object.keys(additionalPuzzles).length > 0) {
+        result.additionalPuzzles = additionalPuzzles;
+      }
+    }
+    
+    // Add main puzzle to allPuzzles (after inner puzzles)
+    allPuzzles.push(result.mainPuzzle);
+    
+    // Add all puzzles in order if we have any
+    if (allPuzzles.length > 0) {
+      result.allPuzzles = allPuzzles;
+    }
+    
+    // Apply decorator-based singleton layer last if requested
+    if (hasSingletonDecorator) {
+      // Build inner puzzle with functions included
+      const innerPuzzleTree = this.buildPuzzleWithDefinitions(innerPuzzle);
+      const innerPuzzleWithFunctions = new PuzzleBuilder()
+        .withMod(innerPuzzleTree);
+      
+      const singletonWrappedPuzzle = withSingletonLayer(innerPuzzleWithFunctions, launcherId!);
+      result.mainPuzzle = singletonWrappedPuzzle;
+      result.innerPuzzle = innerPuzzleWithFunctions;
+      
+      // Add both inner and singleton-wrapped puzzles to allPuzzles
+      allPuzzles.push(innerPuzzleWithFunctions);
+    } else {
+      // Build the final puzzle with functions included
+      const finalPuzzleTree = this.buildPuzzleWithDefinitions(innerPuzzle);
+      
+      // Create a new PuzzleBuilder from the tree
+      const finalPuzzle = new PuzzleBuilder()
+        .withMod(finalPuzzleTree);
+      
+      result.mainPuzzle = finalPuzzle;
     }
     
     return result;
@@ -1996,11 +2417,11 @@ class CodeGenerator {
     }
   }
   
-  private static generateStatementStatic(builder: PuzzleBuilder, stmt: Statement, storageValues?: Map<string, unknown>): void {
+  private static generateStatementStatic(builder: PuzzleBuilder, stmt: Statement, storageValues?: Map<string, unknown>, _paramMap?: Map<string, number>, localVariables?: Map<string, PuzzleExpression | string | number>, functionDefinitions?: Map<string, FunctionDeclaration>): void {
     switch (stmt.type) {
       case 'RequireStatement': {
         const req = stmt as RequireStatement;
-        const condition = CodeGenerator.generateExpressionStatic(req.condition, storageValues);
+        const condition = CodeGenerator.generateExpressionStatic(req.condition, storageValues, _paramMap, localVariables, functionDefinitions);
         const condExpr = CodeGenerator.toPuzzleExpressionStatic(condition);
         builder.require(condExpr, req.message);
         break;
@@ -2008,9 +2429,9 @@ class CodeGenerator {
       
       case 'SendStatement': {
         const send = stmt as SendStatement;
-        const recipient = CodeGenerator.generateExpressionStatic(send.recipient, storageValues);
-        const amount = CodeGenerator.generateExpressionStatic(send.amount, storageValues);
-        const memo = send.memo ? CodeGenerator.generateExpressionStatic(send.memo, storageValues) : undefined;
+        const recipient = CodeGenerator.generateExpressionStatic(send.recipient, storageValues, _paramMap, localVariables, functionDefinitions);
+        const amount = CodeGenerator.generateExpressionStatic(send.amount, storageValues, _paramMap, localVariables, functionDefinitions);
+        const memo = send.memo ? CodeGenerator.generateExpressionStatic(send.memo, storageValues, _paramMap, localVariables, functionDefinitions) : undefined;
         
         // Create coin with proper types and optional memo
         if (typeof recipient === 'string') {
@@ -2085,36 +2506,23 @@ class CodeGenerator {
       }
       
       case 'AssignmentStatement': {
-        const assign = stmt as AssignmentStatement;
+        const assignment = stmt as AssignmentStatement;
         
-        // Check if this is a state assignment
-        if (assign.target.type === 'MemberExpression') {
-          const member = assign.target as MemberExpression;
-          const objId = member.object as Identifier;
-          
-          if (objId.type === 'Identifier' && objId.name === 'state') {
-            const propId = member.property as Identifier;
-            if (propId.type === 'Identifier') {
-              // Generate state update logic
-              builder.comment(`State update: ${propId.name} ${assign.operator} value`);
-              
-              // In a real implementation, this would:
-              // 1. Extract current value from state tree
-              // 2. Apply the operation
-              // 3. Update the state tree
-              // 4. Store new state for coin recreation
-              
-              // For now, we'll add a placeholder
-              builder.comment(`TODO: Update state.${propId.name} with new value`);
-              return;
-            }
-          }
+        // Special handling for returnConditions as a standalone statement
+        if (assignment.target.type === 'Identifier' && (assignment.target as Identifier).name === 'returnConditions') {
+          builder.returnConditions();
+          break;
         }
         
-        // Regular assignment (not state)
-        const targetStr = CodeGenerator.expressionToStringStatic(assign.target);
-        const valueStr = CodeGenerator.expressionToStringStatic(assign.value);
-        builder.comment(`Assignment: ${targetStr} ${assign.operator} ${valueStr}`);
+        // For now, store the value in localVariables if available
+        if (assignment.target.type === 'Identifier' && localVariables) {
+          const targetName = (assignment.target as Identifier).name;
+          const value = CodeGenerator.generateExpressionStatic(assignment.value, storageValues, _paramMap, localVariables);
+          localVariables.set(targetName, value);
+        }
+        
+        // Assignments don't generate conditions directly
+        // They're handled by state management layers
         break;
       }
       
@@ -2135,13 +2543,38 @@ class CodeGenerator {
         CodeGenerator.generateExpressionStatic(expr, storageValues);
         break;
       }
+      
+      case 'ReturnStatement': {
+        const returnStmt = stmt as ReturnStatement;
+        if (returnStmt.value) {
+          const value = CodeGenerator.generateExpressionStatic(returnStmt.value, storageValues);
+          const valueExpr = CodeGenerator.toPuzzleExpressionStatic(value);
+          builder.returnValue(valueExpr);
+        } else {
+          // Return nil/empty if no value specified
+          builder.returnValue(expr(NIL));
+        }
+        break;
+      }
     }
   }
   
-  private static generateExpressionStatic(expr: Expression, storageValues?: Map<string, unknown>): PuzzleExpression | string | number {
+  private static generateExpressionStatic(expr: Expression, storageValues?: Map<string, unknown>, paramMap?: Map<string, number>, localVariables?: Map<string, PuzzleExpression | string | number>, functionDefinitions?: Map<string, FunctionDeclaration>): PuzzleExpression | string | number {
     switch (expr.type) {
       case 'Identifier': {
         const id = expr as Identifier;
+        
+        // Check local variables first
+        if (localVariables && localVariables.has(id.name)) {
+          return localVariables.get(id.name)!;
+        }
+        
+        // Check if this identifier is a parameter with a known position
+        if (paramMap && paramMap.has(id.name)) {
+          const paramIndex = paramMap.get(id.name)!;
+          return variable(paramIndex.toString());
+        }
+        
         // Special identifiers
         if (id.name === 'msg') {
           return variable('msg');
@@ -2271,6 +2704,33 @@ class CodeGenerator {
                 return CodeGenerator.toPuzzleExpressionStatic(arg);
               }
               break;
+            default:
+              // User-defined function calls
+              // Look up the function in the current context
+              if (functionDefinitions && functionDefinitions.has(callee.name)) {
+                // Build a function call expression
+                const argExprs = call.arguments.map(arg => 
+                  CodeGenerator.generateExpressionStatic(arg, storageValues, paramMap, localVariables, functionDefinitions)
+                );
+                
+                // Generate the function call: (function_name arg1 arg2 ...)
+                const argTrees = argExprs.map(e => {
+                  if (typeof e === 'object' && 'tree' in e) {
+                    return e.tree;
+                  } else if (typeof e === 'number') {
+                    return int(e);
+                  } else if (typeof e === 'string') {
+                    return e.startsWith('0x') ? sym(e) : sym(e);
+                  }
+                  return sym('()');
+                });
+                
+                // Create the function call node as a PuzzleExpression
+                return new PuzzleExpression(list([sym(callee.name), ...argTrees]));
+              }
+              
+              // Fallback for unknown functions
+              return variable(`${callee.name}_result`);
           }
         }
         
@@ -2339,6 +2799,15 @@ class CodeGenerator {
       }
       
       return lit.value;
+    } else if (expr.type === 'UnaryExpression') {
+      const unary = expr as UnaryExpression;
+      // Handle negative numbers
+      if (unary.operator === '-' && unary.operand.type === 'Literal') {
+        const operandValue = (unary.operand as Literal).value;
+        if (typeof operandValue === 'number') {
+          return -operandValue;
+        }
+      }
     }
     return null;
   }
@@ -2385,6 +2854,105 @@ class CodeGenerator {
     return '0x' + hash.digest('hex');
   }
   
+  private generateFunction(builder: PuzzleBuilder, func: FunctionDeclaration): void {
+    // Store function for later use when generating defun statements
+    if (!this.functionDefinitions) {
+      this.functionDefinitions = new Map();
+    }
+    this.functionDefinitions.set(func.name, func);
+    
+    // The actual defun generation will happen when we build the puzzle
+    // For now, just add a comment placeholder
+    builder.comment(`Function: ${func.name}${func.isInline ? ' (inline)' : ''}`);
+  }
+  
+  private generateFunctionNode(func: FunctionDeclaration): TreeNode {
+    // Generate defun or defun-inline based on function type
+    const defunType = func.isInline ? 'defun-inline' : 'defun';
+    
+    // Build parameter list
+    const params = func.parameters.map(p => sym(p.name));
+    const paramList = params.length > 0 
+      ? list(params)
+      : NIL;
+    
+    // Create a temporary builder for the function body
+    const bodyBuilder = new PuzzleBuilder().noMod();
+    
+    // Track local variables for the function scope
+    const functionLocalVars = new Map<string, PuzzleExpression | string | number>();
+    
+    // Generate function body
+    let hasReturn = false;
+    for (const stmt of func.body) {
+      if (stmt.type === 'ReturnStatement') {
+        hasReturn = true;
+        const returnStmt = stmt as ReturnStatement;
+        if (returnStmt.value) {
+          const value = CodeGenerator.generateExpressionStatic(
+            returnStmt.value, 
+            this.storageValues, 
+            undefined,
+            functionLocalVars
+          );
+          bodyBuilder.returnValue(value);
+        } else {
+          bodyBuilder.returnValue('()');
+        }
+        break; // Stop after return
+      } else {
+        CodeGenerator.generateStatementStatic(
+          bodyBuilder, 
+          stmt, 
+          this.storageValues,
+          undefined,
+          functionLocalVars
+        );
+      }
+    }
+    
+    // If no explicit return, return nil
+    if (!hasReturn) {
+      bodyBuilder.returnValue('()');
+    }
+    
+    // Build the defun statement
+    const functionBody = bodyBuilder.build();
+    return list([
+      sym(defunType),
+      sym(func.name),
+      paramList,
+      functionBody
+    ]);
+  }
+  
+  private generateConstantNode(name: string, value: unknown): TreeNode {
+    // Generate defconstant statement
+    // (defconstant NAME value)
+    
+    let valueNode: TreeNode;
+    if (typeof value === 'number') {
+      valueNode = int(value);
+    } else if (typeof value === 'string') {
+      if (value.startsWith('0x')) {
+        // For hex values, use the value directly without quotes
+        valueNode = int(parseInt(value.substring(2), 16));
+      } else {
+        // For other strings, use as symbol
+        valueNode = sym(value);
+      }
+    } else {
+      // Default to nil
+      valueNode = NIL;
+    }
+    
+    return list([
+      sym('defconstant'),
+      sym(name),
+      valueNode
+    ]);
+  }
+  
   private calculateActionMerkleRoot(): string {
     // Generate each action as a separate puzzle
     const actionHashes: string[] = [];
@@ -2421,48 +2989,148 @@ class CodeGenerator {
   private generateActionPuzzle(action: ActionDeclaration): PuzzleBuilder {
     const actionPuzzle = new PuzzleBuilder();
     
-    // Action receives current state and parameters
-    actionPuzzle.withSolutionParams('current_state', ...action.parameters.map(p => p.name));
-    
-    actionPuzzle.comment(`Stateful Action: ${action.name}`);
-    
-    // Handle decorators (like @onlyAddress)
-    if (action.decorators) {
-      for (const decorator of action.decorators) {
-        if (decorator.name === 'onlyAddress' && decorator.arguments.length > 0) {
-          // Generate address validation
-          actionPuzzle.comment('Access control check');
-          
-          let addressCheck: PuzzleExpression | null = null;
-          for (const arg of decorator.arguments) {
-            const address = CodeGenerator.generateExpressionStatic(arg, this.storageValues);
-            const addressExpr = CodeGenerator.toPuzzleExpressionStatic(address);
-            const checkExpr = variable('sender').equals(addressExpr);
-            
-            if (addressCheck === null) {
-              addressCheck = checkExpr;
-            } else {
-              addressCheck = addressCheck.or(checkExpr);
-            }
-          }
-          
-          if (addressCheck) {
-            actionPuzzle.require(addressCheck, "Unauthorized");
-          }
+    // For @inner_puzzle actions, create a simple mod that validates conditions
+    if (action.decorators?.some(d => d.name === 'inner_puzzle')) {
+      // Check if we need condition codes library
+      let needsConditionCodes = false;
+      for (const stmt of action.body) {
+        if (stmt.type === 'SendStatement' || stmt.type === 'EmitStatement') {
+          needsConditionCodes = true;
+          break;
         }
       }
+      
+      if (needsConditionCodes) {
+        actionPuzzle.includeConditionCodes();
+      }
+      
+      // Use parameter names for the mod definition
+      const paramNames = action.parameters.map(p => p.name);
+      if (paramNames.length > 0) {
+        actionPuzzle.withSolutionParams(...paramNames);
+      }
+      
+      // Simple validation logic for inner puzzles
+      for (const stmt of action.body) {
+        if (stmt.type === 'RequireStatement') {
+          const req = stmt as RequireStatement;
+          // For now, generate simple condition checks
+          if (req.condition.type === 'BinaryExpression') {
+            const bin = req.condition as BinaryExpression;
+            if (bin.left.type === 'Identifier' && bin.right.type === 'Literal' && bin.operator === '>') {
+              // Handle simple "amount > 0" checks
+              const leftId = bin.left as Identifier;
+              const rightLit = bin.right as Literal;
+              // Use parameter name directly
+              actionPuzzle.if(variable(leftId.name).greaterThan(rightLit.value as number))
+                .then((b: PuzzleBuilder) => { b.returnValue('()'); })  // Do nothing if true
+                .else(b => b.fail("Requirement failed"));
+            }
+          }
+                  } else if (stmt.type === 'SendStatement') {
+            const send = stmt as SendStatement;
+            // Generate CREATE_COIN condition using parameter names
+            if (send.recipient.type === 'Identifier' && send.amount.type === 'Identifier') {
+              const recipientName = (send.recipient as Identifier).name;
+              const amountName = (send.amount as Identifier).name;
+              // Pass recipient as hex address (will be variable name that gets resolved)
+              actionPuzzle.createCoin(
+                recipientName,
+                variable(amountName)
+              );
+            }
+          } else if (stmt.type === 'EmitStatement') {
+            // Generate announcement for emit statement
+            actionPuzzle.createAnnouncement('0x' + '00'.repeat(16));
+          }
+      }
+      
+      // Return empty conditions list if no explicit return
+      if (action.body.length === 0 || 
+          !action.body.some(s => s.type === 'ExpressionStatement')) {
+        actionPuzzle.returnValue('()');
+            }
+      
+      return actionPuzzle;
     }
+    
+    // Original implementation for stateful actions
+    // Action receives current state and parameters
+    const allParams = ['current_state', ...action.parameters.map(p => p.name)];
+    actionPuzzle.withSolutionParams(...allParams);
+    
+    actionPuzzle.comment(`Action: ${action.name}`);
     
     // Generate action body
     for (const stmt of action.body) {
       CodeGenerator.generateStatementStatic(actionPuzzle, stmt, this.storageValues);
     }
     
+    // Check if this is a stateful action
+    const isStateful = action.decorators?.some(d => d.name === 'stateful') || false;
+    
+    if (isStateful) {
     // Return new state and conditions
     actionPuzzle.comment('Return (new_state . conditions)');
     actionPuzzle.returnValue('(new_state . conditions)');
+    } else {
+      // For non-stateful actions, just return conditions
+      if (action.body.length === 0) {
+        actionPuzzle.returnConditions();
+      }
+    }
     
     return actionPuzzle;
+  }
+
+  private buildPuzzleWithDefinitions(builder: PuzzleBuilder): TreeNode {
+    // Get the base puzzle tree
+    const basePuzzle = builder.build();
+    
+    // If no functions or constants, return the base puzzle
+    if (this._functionNodes.length === 0 && this._constantNodes.length === 0) {
+      return basePuzzle;
+    }
+    
+    // We need to inject definitions into the mod structure
+    // The structure is: (mod params includes constants functions body)
+    
+    // Check if basePuzzle is a List type
+    if (basePuzzle.type === 'list') {
+      const listPuzzle = basePuzzle as List;
+      
+      // Check if first item is MOD
+      if (listPuzzle.items.length > 0 && 
+          listPuzzle.items[0].type === 'atom' &&
+          (listPuzzle.items[0] as Atom).value === 'mod') {
+        
+        // Find where includes end and body begins
+        let includeEndIndex = 2;
+        for (let i = 2; i < listPuzzle.items.length; i++) {
+          const item = listPuzzle.items[i];
+          if (!(item.type === 'list' && 
+                (item as List).items.length >= 2 &&
+                (item as List).items[0].type === 'atom' &&
+                ((item as List).items[0] as Atom).value === 'include')) {
+            includeEndIndex = i;
+            break;
+          }
+        }
+        
+        // Rebuild with constants and functions inserted
+        const newItems = [
+          ...listPuzzle.items.slice(0, includeEndIndex), // mod, params, includes
+          ...this._constantNodes, // constant definitions (defconstant)
+          ...this._functionNodes, // function definitions (defun/defun-inline)
+          ...listPuzzle.items.slice(includeEndIndex) // body
+        ];
+        
+        return list(newItems);
+      }
+    }
+    
+    // If not a mod structure, just return the base
+    return basePuzzle;
   }
 }
 
@@ -2516,4 +3184,62 @@ function addressToHex(address: string): string {
   } catch (error) {
     throw new Error(`Invalid Chia address: ${address}. ${error instanceof Error ? error.message : String(error)}`);
   }
+} 
+
+export interface CoinScriptCompilationOptions {
+  /** Output format */
+  format?: 'chialisp' | 'clvm' | 'hex' | 'modhash';
+  /** Whether to compile to CLVM */
+  compiled?: boolean;
+  /** Whether to curry all inner puzzles into a single puzzle */
+  single_puzzle?: boolean;
+  /** Whether to indent the output (for chialisp format) */
+  indent?: boolean;
+}
+
+/**
+ * Compile CoinScript with options for different output formats
+ */
+export function compileCoinScriptWithOptions(source: string, options?: CoinScriptCompilationOptions): string | string[] {
+  const result = compileCoinScript(source);
+  
+  // Default format is chialisp
+  const format = options?.format || 'chialisp';
+  
+  if (options?.single_puzzle && result.allPuzzles && result.allPuzzles.length > 1) {
+    // Single puzzle mode - curry all inner puzzles into the main puzzle
+    const mainPuzzle = result.allPuzzles[result.allPuzzles.length - 1];
+    const innerPuzzles = result.allPuzzles.slice(0, -1);
+    
+    return mainPuzzle.serialize({
+      format,
+      compiled: options?.compiled,
+      indent: options?.indent,
+      single_puzzle: true,
+      innerPuzzles
+    });
+  }
+  
+  // For single coin without inner puzzles, return just the main puzzle serialized
+  if (!result.allPuzzles || result.allPuzzles.length <= 1) {
+    return result.mainPuzzle.serialize({
+      format,
+      compiled: options?.compiled,
+      indent: options?.indent
+    });
+  }
+  
+  // Multiple puzzle mode - return array of serialized puzzles
+  return result.allPuzzles.map(puzzle => {
+    try {
+      return puzzle.serialize({
+        format,
+        compiled: options?.compiled,
+        indent: options?.indent
+      });
+    } catch (error) {
+      // If compilation fails for a puzzle, return error message
+      return `Error: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  });
 } 

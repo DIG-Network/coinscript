@@ -4,7 +4,17 @@
  * High-level language for writing Chia smart coins
  */
 
-export { compileCoinScript, parseCoinScriptFile } from './parser';
+export { 
+  compileCoinScript, 
+  parseCoinScriptFile,
+  compileCoinScriptWithOptions
+} from './parser';
+
+// Re-export compilation options type
+export type { 
+  CoinScriptCompilationResult, 
+  CoinScriptCompilationOptions 
+} from './parser';
 
 // Re-export types for external use
 export type {

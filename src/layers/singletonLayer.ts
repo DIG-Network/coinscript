@@ -6,25 +6,17 @@
 
 import { PuzzleBuilder, puzzle } from '../builder/PuzzleBuilder';
 import { TreeNode } from '../core/types';
-import { list, hex } from '../core/builders';
-import { ConditionOpcode } from '../conditions/opcodes';
+import { list, hex, atom } from '../core/builders';
+import { curry } from '../core/curry';
+import { 
+  loadChialispPuzzle,
+  createChialispPuzzle,
+  STANDARD_MOD_HASHES 
+} from '../chialisp/puzzleLibrary';
 
-// Calculate singleton mod hashes at runtime
-function getSingletonTopLayerModHash(): string {
-  // This would calculate the actual mod hash from the singleton_top_layer_v1_1.clsp
-  // For now, return the known hash
-  return '0x7faa3253bfddd1e0decb0906b2dc6247bbc4cf608f58345d173adb63e8b47c9f';
-}
-
-function getSingletonLauncherModHash(): string {
-  // This would calculate the actual mod hash from the singleton_launcher_v1_1.clsp
-  // For now, return the known hash
-  return '0xeff07522495060c066f66f32acc2a77e3a3e737aca8baea4d1a64ea4cdc13da9';
-}
-
-// Export mod hash getters
-export const SINGLETON_TOP_LAYER_MOD_HASH = getSingletonTopLayerModHash;
-export const SINGLETON_LAUNCHER_MOD_HASH = getSingletonLauncherModHash;
+// Get actual mod hashes from standard puzzles
+export const SINGLETON_TOP_LAYER_MOD_HASH = () => STANDARD_MOD_HASHES.SINGLETON_TOP_LAYER_V1_1;
+export const SINGLETON_LAUNCHER_MOD_HASH = () => STANDARD_MOD_HASHES.SINGLETON_LAUNCHER;
 
 /**
  * Wrap any puzzle with singleton layer
@@ -36,114 +28,84 @@ export function withSingletonLayer(
   innerPuzzle: PuzzleBuilder | TreeNode,
   launcherId: string
 ): PuzzleBuilder {
-  const singleton = puzzle();
   
   const innerTree = innerPuzzle instanceof PuzzleBuilder ? innerPuzzle.build() : innerPuzzle;
   
-  // Create singleton structure as per Chia implementation
-  // Structure: (MOD_HASH LAUNCHER_ID LAUNCHER_HASH)
-  singleton.withCurriedParams({
-    SINGLETON_STRUCT: list([
-      hex(getSingletonTopLayerModHash()),
-      hex(launcherId),
-      hex(getSingletonLauncherModHash())
-    ]),
-    INNER_PUZZLE: innerTree
-  });
+  // Load the actual singleton top layer puzzle
+  const singletonPuzzle = loadChialispPuzzle('SINGLETON_TOP_LAYER_V1_1');
   
-  singleton.withSolutionParams(
-    'inner_solution',
-    'lineage_proof' // (parent_id parent_inner_puzzle_hash parent_amount)
+  // Create singleton structure as per Chia implementation
+  // Structure: (MOD_HASH . (LAUNCHER_ID . LAUNCHER_PUZZLE_HASH))
+  const singletonStruct = list([
+    hex(SINGLETON_TOP_LAYER_MOD_HASH()),
+    list([
+      hex(launcherId),
+      hex(SINGLETON_LAUNCHER_MOD_HASH())
+    ])
+  ]);
+  
+  // Create a properly curried puzzle using the curry function
+  // This maintains the structure (a (q . puzzle) (c (q . param1) (c (q . param2) 1)))
+  const curriedPuzzle = curry(
+    singletonPuzzle.ast,
+    singletonStruct,
+    innerTree
   );
   
-  singleton.includeConditionCodes();
-  singleton.includeCurryAndTreehash();
+  // Create a new PuzzleBuilder with the curried puzzle
+  const result = puzzle();
+  result.withMod(curriedPuzzle);
   
-  // Simplified singleton logic - just run inner puzzle and add singleton assertion
-  singleton.comment('Singleton layer ensures uniqueness');
+  // Set solution parameters matching the actual singleton puzzle
+  result.withSolutionParams(
+    'lineage_proof',     // (parent_info parent_inner_puzzle_hash parent_amount)
+    'my_amount',         // Current coin amount (must be odd)
+    'inner_solution'     // Solution for the inner puzzle
+  );
   
-  // Assert singleton amount (must be odd)
-  singleton.addCondition(ConditionOpcode.ASSERT_MY_AMOUNT, 1);
+  result.comment('Singleton layer (using standard singleton_top_layer_v1_1.clsp)');
   
-  // For a proper singleton, we'd need to:
-  // 1. Verify lineage proof
-  // 2. Run inner puzzle
-  // 3. Wrap CREATE_COIN conditions with singleton layer
-  // 4. Ensure singleton properties are maintained
-  
-  // For now, we'll create a nested structure that properly separates the inner puzzle
-  // This is still simplified compared to the real singleton
-  singleton.comment('Return conditions from inner puzzle');
-  
-  // In real singleton, this would be more complex with lineage verification
-  // For now, just delegate to inner puzzle
-  // The key is to NOT inline the inner puzzle code, but reference it as a parameter
-  
-  // This creates: (a INNER_PUZZLE inner_solution)
-  // where INNER_PUZZLE is curried in, not inlined
-  singleton.payToConditions(); // This will create (a (q . 2) 1) which runs conditions from solution
-  
-  // Actually we need to run the inner puzzle, not conditions
-  // Override the nodes to create the proper delegation
-  singleton['nodes'] = [];
-  singleton.delegatedPuzzle(); // Creates (a 2 3) - run puzzle from arg2 with solution arg3
-  
-  // But we need to use INNER_PUZZLE parameter, not arg2
-  // So we'll manually construct the correct expression
-  singleton['nodes'] = [
-    singleton.param('INNER_PUZZLE').tree,  // The inner puzzle (curried)
-    singleton.param('inner_solution').tree  // The solution for inner puzzle
-  ];
-  
-  // Actually, let's use the merge approach to properly construct this
-  const runner = puzzle();
-  runner.noMod();
-  // Create (a INNER_PUZZLE inner_solution)
-  runner.returnValue(`(a INNER_PUZZLE inner_solution)`);
-  
-  singleton.merge(runner);
-  
-  return singleton;
+  return result;
 }
 
 /**
  * Create a singleton launcher puzzle
- * @param _puzzleHash - The puzzle hash to launch as a singleton (unused in simplified version)
- * @param _amount - The amount for the singleton (unused in simplified version)
+ * @param singletonPuzzleHash - The puzzle hash of the singleton to launch
+ * @param amount - The amount for the singleton (must be odd)
  * @returns Launcher puzzle that creates the initial singleton
  */
 export function createSingletonLauncher(
-  _puzzleHash: string | Uint8Array,
+  _singletonPuzzleHash: string | Uint8Array,
   _amount: number | bigint
 ): PuzzleBuilder {
-  const launcher = puzzle();
+  // Use createChialispPuzzle to get a PuzzleBuilder with the launcher puzzle
+  const launcher = createChialispPuzzle('SINGLETON_LAUNCHER');
   
-  // Launcher accepts: (singleton_puzzle_hash amount key_value_list)
-  launcher.withSolutionParams('singleton_puzzle_hash', 'amount', 'key_value_list');
-  
-  launcher.comment('Singleton launcher creates initial singleton coin');
-  
-  // Create the singleton coin with proper amount (must be odd)
-  launcher.addCondition(ConditionOpcode.CREATE_COIN,
-    launcher.param('singleton_puzzle_hash'),
-    launcher.param('amount')
+  // The singleton launcher expects these solution parameters:
+  launcher.withSolutionParams(
+    'singleton_puzzle_hash',  // The puzzle hash of the singleton we're launching
+    'amount',                 // Amount for the singleton (must be odd)
+    'key_value_list'         // Additional conditions as key-value pairs
   );
   
-  // Add the launcher assertion - this is critical for singleton operation
-  // ASSERT_MY_COIN_ID ensures this can only be spent once
-  launcher.comment('Assert launcher coin ID for uniqueness');
-  launcher.addCondition(ConditionOpcode.ASSERT_MY_COIN_ID, 
-    launcher.param('my_coin_id') // This would need to be provided in solution
-  );
-  
-  // Process key_value_list for additional conditions
-  launcher.comment('Process additional conditions from key_value_list');
-  // In a full implementation, this would iterate through key_value_list
-  // and add any additional conditions
-  
-  launcher.returnConditions();
+  launcher.comment('Singleton launcher (using standard singleton_launcher.clsp)');
   
   return launcher;
+}
+
+/**
+ * Helper to create singleton structure
+ * @param launcherId - The launcher coin ID
+ * @returns The singleton struct for currying
+ */
+export function createSingletonStruct(launcherId: string): TreeNode {
+  return list([
+    hex(SINGLETON_TOP_LAYER_MOD_HASH()),
+    list([
+      hex(launcherId),
+      hex(SINGLETON_LAUNCHER_MOD_HASH())
+    ])
+  ]);
 }
 
 /**
@@ -163,4 +125,72 @@ export function calculateSingletonPuzzleHash(
   
   // For now, return a deterministic placeholder based on inputs
   return `0x${innerHashStr.slice(2, 10)}${launcherIdStr.slice(2, 10)}${'0'.repeat(48)}`;
+}
+
+/**
+ * Create a singleton template puzzle (uncurried)
+ * This shows the structure with SINGLETON_STRUCT and INNER_PUZZLE as parameters
+ * @returns Singleton template puzzle
+ */
+export function createSingletonTemplate(): PuzzleBuilder {
+  // Load the actual singleton top layer puzzle
+  const singletonPuzzle = loadChialispPuzzle('SINGLETON_TOP_LAYER_V1_1');
+  
+  // Create a new PuzzleBuilder with the template
+  const result = puzzle();
+  result.withMod(singletonPuzzle.ast);
+  
+  // Add curried parameters that will be shown as placeholders
+  result.withCurriedParams({
+    'SINGLETON_STRUCT': 'SINGLETON_STRUCT',
+    'INNER_PUZZLE': 'INNER_PUZZLE'
+  });
+  
+  // Set solution parameters matching the actual singleton puzzle
+  result.withSolutionParams(
+    'lineage_proof',     // (parent_info parent_inner_puzzle_hash parent_amount)
+    'my_amount',         // Current coin amount (must be odd)
+    'inner_solution'     // Solution for the inner puzzle
+  );
+  
+  result.comment('Singleton template (uncurried)');
+  
+  return result;
+}
+
+/**
+ * Create a lineage proof for eve (first) spend
+ * @param parentCoinInfo - The parent coin info (launcher coin)
+ * @param amount - The amount from the launcher
+ * @returns Eve lineage proof
+ */
+export function createEveLineageProof(
+  parentCoinInfo: string | Uint8Array,
+  amount: number | bigint
+): TreeNode {
+  // Eve proof format: (parent_coin_info amount)
+  return list([
+    typeof parentCoinInfo === 'string' ? hex(parentCoinInfo) : atom(parentCoinInfo),
+    atom(amount)
+  ]);
+}
+
+/**
+ * Create a lineage proof for non-eve spends
+ * @param parentCoinInfo - The parent coin info
+ * @param parentInnerPuzzleHash - The parent's inner puzzle hash
+ * @param parentAmount - The parent's amount
+ * @returns Standard lineage proof
+ */
+export function createLineageProof(
+  parentCoinInfo: string | Uint8Array,
+  parentInnerPuzzleHash: string | Uint8Array,
+  parentAmount: number | bigint
+): TreeNode {
+  // Standard proof format: (parent_coin_info parent_inner_puzzle_hash parent_amount)
+  return list([
+    typeof parentCoinInfo === 'string' ? hex(parentCoinInfo) : atom(parentCoinInfo),
+    typeof parentInnerPuzzleHash === 'string' ? hex(parentInnerPuzzleHash) : atom(parentInnerPuzzleHash),
+    atom(parentAmount)
+  ]);
 } 

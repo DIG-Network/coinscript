@@ -18,8 +18,9 @@ import { formatCLSP } from '../core/clspFormatter';
 import { 
   IF, CONS, ADD, SUBTRACT, MULTIPLY, DIVIDE, GT, GTS, EQ, NOT,
   SHA256, SHA256TREE1, APPLY, QUOTE, ARG, ARG1, ARG2, ARG3,
-  ALL, ANY, ASSERT, NIL, MOD
+  ALL, ANY, NIL, MOD, RAISE
 } from '../core/opcodes';
+import { Program } from 'clvm-lib';
 
 // Type-safe condition builders
 export interface ConditionBuilder {
@@ -185,7 +186,7 @@ export class PuzzleBuilder implements ConditionBuilder {
    * Include standard condition codes library
    */
   includeConditionCodes(): PuzzleBuilder {
-    return this.include('condition_codes.clvm');
+    return this.include('condition_codes.clib');
   }
   
   /**
@@ -253,19 +254,43 @@ export class PuzzleBuilder implements ConditionBuilder {
     return this;
   }
   
+  /**
+   * Set a custom mod structure (e.g., from loaded Chialisp)
+   */
+  withMod(modAst: TreeNode): PuzzleBuilder {
+    this.customMod = modAst;
+    return this;
+  }
+  
+  private customMod?: TreeNode;
+  
   // === COIN OPERATIONS ===
   
   createCoin(puzzleHash: string | Uint8Array, amount: number | bigint | Expression, memo?: string | Uint8Array): PuzzleBuilder {
+    // Use symbolic name if condition codes are included
+    const opcodeExpr = this.includes.includes('condition_codes.clvm') || this.includes.includes('condition_codes.clib')
+      ? sym('CREATE_COIN')
+      : int(51);
+    
+    // Handle puzzle hash - if it's a parameter name (not hex), treat it as a variable
+    let puzzleHashExpr: TreeNode;
+    if (typeof puzzleHash === 'string' && !puzzleHash.startsWith('0x') && puzzleHash.match(/^[a-zA-Z_]\w*$/)) {
+      // It's a variable name
+      puzzleHashExpr = sym(puzzleHash);
+    } else {
+      puzzleHashExpr = toTree(puzzleHash);
+    }
+      
     const condition = memo 
       ? list([
-          int(51), // CREATE_COIN
-          toTree(puzzleHash),
+          opcodeExpr,
+          puzzleHashExpr,
           toTree(amount),
           toTree(memo)
         ])
       : list([
-          int(51), // CREATE_COIN
-          toTree(puzzleHash),
+          opcodeExpr,
+          puzzleHashExpr,
           toTree(amount)
         ]);
     this.addNode(condition);
@@ -276,8 +301,11 @@ export class PuzzleBuilder implements ConditionBuilder {
   
   requireSignature(pubkey: string | Uint8Array, message?: Expression): PuzzleBuilder {
     const msg = message || new Expression(list([SHA256TREE1, ARG1]));
+    const opcodeExpr = this.includes.includes('condition_codes.clvm') || this.includes.includes('condition_codes.clib')
+      ? sym('AGG_SIG_ME')
+      : int(50);
     const condition = list([
-      int(50), // AGG_SIG_ME
+      opcodeExpr,
       toTree(pubkey),
       msg.tree
     ]);
@@ -336,7 +364,10 @@ export class PuzzleBuilder implements ConditionBuilder {
   // === ANNOUNCEMENTS ===
   
   createAnnouncement(message: string | Uint8Array): PuzzleBuilder {
-    const condition = list([int(60), toTree(message)]); // CREATE_COIN_ANNOUNCEMENT
+    const opcodeExpr = this.includes.includes('condition_codes.clvm') || this.includes.includes('condition_codes.clib')
+      ? sym('CREATE_COIN_ANNOUNCEMENT')
+      : int(60);
+    const condition = list([opcodeExpr, toTree(message)]);
     this.addNode(condition);
     return this;
   }
@@ -364,7 +395,34 @@ export class PuzzleBuilder implements ConditionBuilder {
   // === RAW CONDITIONS ===
   
   addCondition(opcode: number, ...args: (Expression | string | number | Uint8Array)[]): PuzzleBuilder {
-    const condition = list([int(opcode), ...args.map(toTree)]);
+    // Map of opcodes to their symbolic names from condition_codes.clib
+    const opcodeNames: Record<number, string> = {
+      1: 'REMARK',
+      49: 'AGG_SIG_UNSAFE',
+      50: 'AGG_SIG_ME',
+      51: 'CREATE_COIN',
+      52: 'RESERVE_FEE',
+      60: 'CREATE_COIN_ANNOUNCEMENT',
+      61: 'ASSERT_COIN_ANNOUNCEMENT',
+      62: 'CREATE_PUZZLE_ANNOUNCEMENT',
+      63: 'ASSERT_PUZZLE_ANNOUNCEMENT',
+      70: 'ASSERT_MY_COIN_ID',
+      71: 'ASSERT_MY_PARENT_ID',
+      72: 'ASSERT_MY_PUZZLEHASH',
+      73: 'ASSERT_MY_AMOUNT',
+      80: 'ASSERT_SECONDS_RELATIVE',
+      81: 'ASSERT_SECONDS_ABSOLUTE',
+      82: 'ASSERT_HEIGHT_RELATIVE',
+      83: 'ASSERT_HEIGHT_ABSOLUTE'
+    };
+    
+    // Use symbolic name if condition codes are included and we have a name for this opcode
+    const hasConditionCodes = this.includes.includes('condition_codes.clvm') || this.includes.includes('condition_codes.clib');
+    const opcodeExpr = hasConditionCodes && opcodeNames[opcode]
+      ? sym(opcodeNames[opcode])
+      : int(opcode);
+      
+    const condition = list([opcodeExpr, ...args.map(toTree)]);
     this.addNode(condition);
     return this;
   }
@@ -476,8 +534,13 @@ export class PuzzleBuilder implements ConditionBuilder {
   // === UTILITIES ===
   
   require(condition: Expression, _message?: string): PuzzleBuilder {
-    // Assert condition is true
-    const assertion = list([ASSERT, condition.tree]);
+    // Assert condition is true using (if (not condition) (x) ())
+    const assertion = list([
+      IF,
+      list([NOT, condition.tree]),
+      list([RAISE]),  // Raise exception if condition is false
+      NIL  // Do nothing if condition is true
+    ]);
     this.addNode(assertion);
     return this;
   }
@@ -511,6 +574,19 @@ export class PuzzleBuilder implements ConditionBuilder {
   build(): TreeNode {
     if (this.currentContext !== 'main') {
       throw new Error('Incomplete control flow - missing else() or build()');
+    }
+    
+    // If we have a custom mod (e.g., from loaded Chialisp), use it
+    if (this.customMod) {
+      // Apply curried parameters if any
+      if (this.curriedParams.size > 0) {
+        const substitutions = new Map<string, TreeNode>();
+        this.curriedParams.forEach((value, name) => {
+          substitutions.set(name, value);
+        });
+        return substitute(this.customMod, substitutions);
+      }
+      return this.customMod;
     }
     
     let body = this.buildNodeList(this.nodes);
@@ -563,10 +639,15 @@ export class PuzzleBuilder implements ConditionBuilder {
     return list([MOD, paramList, body]);
   }
   
-  serialize(options?: { indent?: boolean }): string {
+  serialize(options?: SerializeOptions): string {
     const tree = this.build();
+    
+    // Default to chialisp format
+    const format = options?.format || 'chialisp';
+    
+    if (format === 'chialisp') {
     const clspCode = serialize(tree, {
-      ...options,
+        indent: options?.indent,
       comments: this.comments,
       blockComments: this.blockComments
     });
@@ -580,6 +661,90 @@ export class PuzzleBuilder implements ConditionBuilder {
     }
     
     return clspCode;
+    }
+    
+    // For other formats, we need to use clvm-lib
+    try {
+      // First serialize to ChiaLisp
+      let clspCode = serialize(tree, {
+        comments: this.comments,
+        blockComments: this.blockComments
+      });
+      
+      // Preprocess includes by inlining condition codes
+      if (clspCode.includes('(include condition_codes.clib)')) {
+        // Define the condition codes inline
+        const conditionCodes = `
+          (defconstant AGG_SIG_UNSAFE 49)
+          (defconstant AGG_SIG_ME 50)
+          (defconstant CREATE_COIN 51)
+          (defconstant RESERVE_FEE 52)
+          (defconstant CREATE_COIN_ANNOUNCEMENT 60)
+          (defconstant ASSERT_COIN_ANNOUNCEMENT 61)
+          (defconstant CREATE_PUZZLE_ANNOUNCEMENT 62)
+          (defconstant ASSERT_PUZZLE_ANNOUNCEMENT 63)
+          (defconstant ASSERT_MY_COIN_ID 70)
+          (defconstant ASSERT_MY_PARENT_ID 71)
+          (defconstant ASSERT_MY_PUZZLEHASH 72)
+          (defconstant ASSERT_MY_AMOUNT 73)
+          (defconstant ASSERT_SECONDS_RELATIVE 80)
+          (defconstant ASSERT_SECONDS_ABSOLUTE 81)
+          (defconstant ASSERT_HEIGHT_RELATIVE 82)
+          (defconstant ASSERT_HEIGHT_ABSOLUTE 83)
+          (defconstant REMARK 1)
+        `;
+        
+        // Replace the include with the actual constants
+        clspCode = clspCode.replace('(include condition_codes.clib)', conditionCodes);
+      }
+      
+      // Create a Program from the ChiaLisp code
+      const program = Program.fromSource(clspCode);
+      
+      // Handle single_puzzle mode - curry inner puzzles
+      let finalProgram = program;
+      if (options?.single_puzzle && options.innerPuzzles && options.innerPuzzles.length > 0) {
+        // Build all inner puzzles and curry them
+        const innerPrograms = options.innerPuzzles.map(p => {
+          const innerClsp = serialize(p.build());
+          return Program.fromSource(innerClsp);
+        });
+        
+        // Curry each inner puzzle into the main puzzle
+        finalProgram = program.curry(innerPrograms);
+      }
+      
+      // Compile if requested or required for the format
+      const needsCompilation = options?.compiled || format === 'modhash' || format === 'hex';
+      if (needsCompilation) {
+        // Compile the program
+        const compiledOutput = finalProgram.compile();
+        
+        // The compile() method returns an object with value and cost properties
+        // Extract the actual compiled program
+        if (typeof compiledOutput === 'object' && compiledOutput !== null && 'value' in compiledOutput) {
+          // Update finalProgram to be the compiled result
+          finalProgram = compiledOutput.value;
+        } else {
+          throw new Error('Unexpected compile output format');
+        }
+      }
+      
+      // Return based on format
+      switch (format) {
+        case 'clvm':
+          return finalProgram.toString();
+        case 'hex':
+          // Use serializeHex for hex format
+          return finalProgram.serializeHex();
+        case 'modhash':
+          return finalProgram.hashHex();
+        default:
+          throw new Error(`Unknown format: ${format as string}`);
+      }
+    } catch (error) {
+      throw new Error(`Failed to serialize to ${format}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
   
   /**
@@ -659,8 +824,30 @@ export function expr(value: number | bigint | string | TreeNode): Expression {
 }
 
 export function variable(name: string): Expression {
+  // Handle numeric parameter references
+  if (/^\d+$/.test(name)) {
+    return new Expression(int(parseInt(name)));
+  }
+  // Handle @ symbol for arg1
+  if (name === '@') {
+    return new Expression(ARG);
+  }
+  // For other names, create a symbol
   return new Expression(sym(name));
 }
 
 // Convenience exports
 export { Expression as Expr }; 
+
+export interface SerializeOptions {
+  /** Whether to indent the output */
+  indent?: boolean;
+  /** Output format */
+  format?: 'chialisp' | 'clvm' | 'hex' | 'modhash';
+  /** Whether to compile to CLVM first (for clvm/hex/modhash formats) */
+  compiled?: boolean;
+  /** Whether to curry all inner puzzles into a single puzzle */
+  single_puzzle?: boolean;
+  /** Inner puzzles to curry (for single_puzzle mode) */
+  innerPuzzles?: PuzzleBuilder[];
+} 
