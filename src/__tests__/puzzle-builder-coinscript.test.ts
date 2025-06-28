@@ -6,7 +6,6 @@
 
 import { 
   compileCoinScript,
-  puzzle,
   PuzzleBuilder
 } from '../index';
 
@@ -73,8 +72,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       // Should have action dispatch logic
       expect(serialized).toContain('if');
@@ -102,8 +101,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       expect(serialized).toContain('count');
       expect(serialized).toContain('lastUser');
@@ -139,8 +138,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       expect(serialized).toContain('state');
       expect(serialized).toContain('if');
@@ -166,8 +165,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       // Events should create announcements
       expect(serialized).toContain('60'); // CREATE_COIN_ANNOUNCEMENT
@@ -187,8 +186,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       expect(serialized).toContain('60'); // CREATE_COIN_ANNOUNCEMENT
       expect(serialized).toContain('61'); // ASSERT_COIN_ANNOUNCEMENT
@@ -231,8 +230,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       expect(serialized).toContain('admin');
       expect(serialized).toContain('operators');
@@ -260,8 +259,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       expect(serialized).toContain('unlockTime');
       expect(serialized).toContain('80'); // Time assertion
@@ -315,8 +314,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       expect(serialized).toContain('buyer');
       expect(serialized).toContain('seller');
@@ -355,8 +354,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       expect(serialized).toContain('owners');
       expect(serialized).toContain('threshold');
@@ -392,8 +391,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       expect(serialized).toContain('owner');
       expect(serialized).toContain('pendingOwner');
@@ -416,8 +415,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       expect(serialized).toContain('singleton');
     });
@@ -434,8 +433,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       expect(serialized).toContain('66'); // SEND_MESSAGE
     });
@@ -453,8 +452,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       expect(serialized).toContain('assert');
       expect(serialized).toContain('>'); // Greater than
@@ -473,8 +472,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       // Should handle default action
       expect(serialized).toContain('default');
@@ -500,8 +499,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       expect(serialized).toContain('owner');
       expect(serialized).toContain('onlyOwner');
@@ -531,8 +530,8 @@ describe('PuzzleBuilder - CoinScript Compilation', () => {
         }
       `;
       
-      const p = compileCoinScript(code);
-      const serialized = p.serialize();
+      const result = compileCoinScript(code);
+      const serialized = result.mainPuzzle.serialize();
       
       expect(serialized).toContain('packed');
       expect(serialized).toContain('>>'); // Bit shift

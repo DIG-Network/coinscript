@@ -6,18 +6,17 @@
 
 import {
   puzzle,
-  expr,
+  Expression,
   variable,
-  isAtom,
-  isList,
+  expr,
   int,
-  sym,
   hex,
+  sym,
   list,
   nil,
   cons,
-  Expression,
-  TreeNode
+  isAtom,
+  isList
 } from '../index';
 
 describe('PuzzleBuilder - AST Operations (Fixed)', () => {

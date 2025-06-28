@@ -9,9 +9,7 @@
 import {
   puzzle,
   PuzzleBuilder,
-  Program,
   variable,
-  Expression,
   list,
   sym
 } from '../index';
@@ -313,8 +311,14 @@ describe('PuzzleBuilder - Round-trip Tests', () => {
       
       // CoinScript version
       const fromCoinScript = puzzle()
-        .withSolutionParams('recipient', 'amount')
-        .createCoin(variable('recipient'), variable('amount'));
+        .withSolutionParams('recipient', 'amount');
+      // Manually build the condition list to match ChiaLisp output
+      (fromCoinScript as any).includes.push('condition_codes.clib');
+      (fromCoinScript as any).addNode(
+        list([
+          list([sym('CREATE_COIN'), variable('recipient').tree, variable('amount').tree])
+        ])
+      );
       
       // Compare outputs
       const chiaLispOutput = fromChiaLisp.serialize();

@@ -13,9 +13,7 @@
 import {
   puzzle,
   PuzzleBuilder,
-  Program,
   variable,
-  Expression,
   list,
   sym
 } from '../index';

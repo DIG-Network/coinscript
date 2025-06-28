@@ -6,13 +6,7 @@
  */
 
 import {
-  puzzle,
   PuzzleBuilder,
-  Program,
-  variable,
-  Expression,
-  list,
-  sym,
   isAtom,
   isList
 } from '../index';
@@ -25,7 +19,7 @@ describe('PuzzleBuilder - Include Files Round-trip', () => {
   describe('condition_codes.clib', () => {
     test('should load and preserve all condition code constants', () => {
       const filePath = path.join(includesDir, 'condition_codes.clib');
-      const content = fs.readFileSync(filePath, 'utf-8');
+      fs.readFileSync(filePath, 'utf-8');
       
       // Create a simple mod that includes the file
       const testMod = `(mod ()

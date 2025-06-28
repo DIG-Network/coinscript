@@ -6,8 +6,6 @@
  */
 
 import {
-  puzzle,
-  PuzzleBuilder,
   serialize,
   isAtom,
   isList,

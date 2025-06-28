@@ -5,10 +5,8 @@
  */
 
 import {
-  puzzle,
   PuzzleBuilder,
-  isList,
-  isAtom
+  isList
 } from '../index';
 import * as fs from 'fs';
 import * as path from 'path';

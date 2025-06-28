@@ -394,12 +394,11 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
         .comment('This is a payment')
         .createCoin(TEST_ADDRESS, TEST_AMOUNT);
       
-      const indented = p.serialize({ indent: true });
       // Note: Comments might not be preserved in serialization
-      // expect(indented).toContain('This is a payment');
+      p.serialize({ indent: true });
       
-      const compact = p.serialize();
       // Comments are not preserved in serialization
+      p.serialize();
     });
 
     test('should add block comments', () => {
