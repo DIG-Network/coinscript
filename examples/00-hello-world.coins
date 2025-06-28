@@ -1,5 +1,7 @@
 // Example 00: Hello World
 // The absolute simplest CoinScript coin - returns conditions from solution
+include condition_codes.clib
+include opcodes.clib
 
 coin HelloWorld {
     // Every coin needs at least one action to be spendable

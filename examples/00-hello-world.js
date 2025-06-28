@@ -21,7 +21,8 @@ showHeader('00', 'Hello World', 'The simplest possible CoinScript coin - returns
 showCoinScriptSource('./00-hello-world.coins');
 
 // Compile the coin
-const puzzle = parseCoinScriptFile('./00-hello-world.coins');
+const result = parseCoinScriptFile('./00-hello-world.coins');
+const puzzle = result.mainPuzzle;
 showPuzzle(puzzle);
 
 // Create a solution

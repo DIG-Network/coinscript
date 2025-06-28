@@ -80,6 +80,8 @@ export interface SerializeOptions {
   comments?: Map<TreeNode, string>;
   // Block comments to add before the body
   blockComments?: string[];
+  // List of included libraries to determine which constants to use
+  includedLibraries?: string[];
 }
 
 export interface ParseOptions {

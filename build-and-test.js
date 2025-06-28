@@ -21,7 +21,7 @@ const tests = [
     name: 'Simple action',
     code: `coin SimpleAction {
       action spend(bytes32 conditions) {
-        conditions
+        conditions;
       }
     }`,
     expected: 'Should generate a simple mod with conditions parameter'
@@ -34,7 +34,7 @@ const tests = [
       
       action spend(bytes32 conditions) {
         require(msg.sender == owner, "Not owner");
-        conditions
+        conditions;
       }
     }`,
     expected: 'Should substitute storage value in the code'
@@ -59,11 +59,13 @@ let failed = 0;
 tests.forEach((test, index) => {
   console.log(`Test ${index + 1}: ${test.name}`);
   try {
-    const puzzle = compileCoinScript(test.code);
-    const chialisp = puzzle.build();
+    const result = compileCoinScript(test.code);
+    const puzzle = result.mainPuzzle;
+    const chialisp = puzzle.serialize({ indent: true });
+    console.log('✓ PASSED');
     console.log('Generated ChiaLisp:');
     console.log(chialisp);
-    console.log(`✓ PASSED - ${test.expected}\n`);
+    console.log(`Expected: ${test.expected}\n`);
     passed++;
   } catch (error) {
     console.log(`✗ FAILED: ${error.message}`);

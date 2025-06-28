@@ -12,7 +12,7 @@ coin TransferExample {
     // Send creates a simple coin without memo
     action sendFunds(address to, uint256 amount) {
         require(amount > 0, "Amount must be positive");
-        send to, amount;
+        send(to, amount);
         emit Transfer(to, amount);
     }
     
@@ -25,7 +25,7 @@ coin TransferExample {
         lastTransferTime = block.timestamp;
         
         // Transfer with memo containing updated state
-        transfer to, amount, "state_update";
+        send(to, amount, "state_update");
         
         emit TransferWithMemo(to, amount, "state_update");
     }
@@ -35,7 +35,7 @@ coin TransferExample {
         require(amount > 0, "Amount must be positive");
         
         // Transfer with memo for tracking
-        transfer treasury, amount, "treasury_deposit";
+        send(treasury, amount, "treasury_deposit");
         
         emit TransferWithMemo(treasury, amount, "treasury_deposit");
     }

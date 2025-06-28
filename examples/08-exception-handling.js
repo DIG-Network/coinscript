@@ -10,7 +10,8 @@ console.log('=== Exception Handling Example ===\n');
 
 // Parse the SafeVault coin
 const puzzlePath = path.join(__dirname, '08-exception-handling.coins');
-const puzzle = parseCoinScriptFile(puzzlePath);
+const result = parseCoinScriptFile(puzzlePath);
+const puzzle = result.mainPuzzle;
 
 console.log('SafeVault Puzzle:');
 console.log('─'.repeat(50));

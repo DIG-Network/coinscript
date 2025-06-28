@@ -22,7 +22,8 @@ showHeader('01', 'Basic Payment', 'Using the "default" action for simpler coins.
 showCoinScriptSource('./01-basic-payment.coins');
 
 // Compile the coin
-const puzzle = parseCoinScriptFile('./01-basic-payment.coins');
+const result = parseCoinScriptFile('./01-basic-payment.coins');
+const puzzle = result.mainPuzzle;
 showPuzzle(puzzle);
 
 // Solution 1 - Simple transfer

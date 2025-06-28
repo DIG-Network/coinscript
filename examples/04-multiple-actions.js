@@ -22,7 +22,8 @@ showHeader('04', 'Multiple Actions', 'Creating coins with multiple spend paths.'
 showCoinScriptSource('./04-multiple-actions.coins');
 
 // Compile the coin
-const puzzle = parseCoinScriptFile('./04-multiple-actions.coins');
+const result = parseCoinScriptFile('./04-multiple-actions.coins');
+const puzzle = result.mainPuzzle;
 showPuzzle(puzzle, { showHash: false });
 
 showNote('This coin has 4 different actions: default, ownerSpend, transfer, and burn');

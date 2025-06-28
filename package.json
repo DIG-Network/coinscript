@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "postbuild": "node scripts/copy-chialisp.js",
     "clean": "rm -rf dist",
     "prebuild": "npm run clean",
     "test": "jest",

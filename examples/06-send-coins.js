@@ -22,7 +22,8 @@ showHeader('06', 'Send Coins', 'Creating new coins with send().');
 showCoinScriptSource('./06-send-coins.coins');
 
 // Compile the coin
-const puzzle = parseCoinScriptFile('./06-send-coins.coins');
+const result = parseCoinScriptFile('./06-send-coins.coins');
+const puzzle = result.mainPuzzle;
 showPuzzle(puzzle);
 
 // Explain send() function

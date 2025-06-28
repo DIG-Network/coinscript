@@ -22,7 +22,8 @@ showHeader('02', 'Require Signature', 'Adding security with signature requiremen
 showCoinScriptSource('./02-require-signature.coins');
 
 // Compile the coin
-const puzzle = parseCoinScriptFile('./02-require-signature.coins');
+const result = parseCoinScriptFile('./02-require-signature.coins');
+const puzzle = result.mainPuzzle;
 showPuzzle(puzzle);
 
 // Explain the security model

@@ -22,7 +22,8 @@ showHeader('05', 'Require Statements', 'Validation and error handling patterns.'
 showCoinScriptSource('./05-require-statements.coins');
 
 // Compile the coin
-const puzzle = parseCoinScriptFile('./05-require-statements.coins');
+const result = parseCoinScriptFile('./05-require-statements.coins');
+const puzzle = result.mainPuzzle;
 showPuzzle(puzzle);
 
 // Show validation patterns

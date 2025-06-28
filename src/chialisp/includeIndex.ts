@@ -241,19 +241,13 @@ export const CONDITION_CODES: Record<number, string> = {
 
 /**
  * Determine which includes are needed based on features used
+ * Note: condition_codes.clib is NOT auto-included - users must explicitly include it
  */
 export function determineRequiredIncludes(features: Set<string>): string[] {
   const includes: string[] = [];
   
-  // Always include condition codes if any conditions are used
-  if (Array.from(features).some(f => 
-    f.startsWith('CREATE_') || 
-    f.startsWith('ASSERT_') || 
-    f.startsWith('AGG_SIG_') ||
-    f === 'RESERVE_FEE'
-  )) {
-    includes.push('condition_codes.clib');
-  }
+  // Do NOT auto-include condition_codes.clib
+  // Users must explicitly include it if they want symbolic condition names
   
   // Include sha256tree if tree hashing is used
   if (features.has('sha256tree')) {
@@ -280,13 +274,8 @@ export function determineRequiredIncludes(features: Set<string>): string[] {
     includes.push('cat_truths.clib');
   }
   
-  // Include opcodes for CLVM operator constants
-  if (Array.from(features).some(f => {
-    const opcodeConstants = Object.keys(CHIALISP_INCLUDES['opcodes.clib'].constants || {});
-    return opcodeConstants.includes(f);
-  })) {
-    includes.push('opcodes.clib');
-  }
+  // Do NOT auto-include opcodes.clib
+  // Users must explicitly include it if they want operator constants
   
   return includes;
 }

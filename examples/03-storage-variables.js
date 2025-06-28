@@ -22,7 +22,8 @@ showHeader('03', 'Storage Variables', 'Using different types of immutable storag
 showCoinScriptSource('./03-storage-variables.coins');
 
 // Compile the coin
-const puzzle = parseCoinScriptFile('./03-storage-variables.coins');
+const result = parseCoinScriptFile('./03-storage-variables.coins');
+const puzzle = result.mainPuzzle;
 showPuzzle(puzzle);
 
 showNote('Storage variables are curried into the puzzle, making it longer than simple examples');

@@ -1,9 +1,10 @@
-const { parseCoinScriptFile } = require('../dist/coinscript/parser');
+const { parseCoinScriptFile } = require('./dist/coinscript/parser');
 
 console.log('=== Example 09: Transfer vs Send ===\n');
 
 // Parse the CoinScript file
-const puzzle = parseCoinScriptFile('09-transfer-example.coins');
+const result = parseCoinScriptFile('09-transfer-example.coins');
+const puzzle = result.mainPuzzle;
 
 // Generate ChiaLisp
 const chialisp = puzzle.serialize({ indent: true });

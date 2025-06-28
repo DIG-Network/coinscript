@@ -591,8 +591,13 @@ export class PuzzleBuilder implements ConditionBuilder {
   }
   
   returnConditions(): PuzzleBuilder {
-    // Return conditions from solution (arg1)
-    this.addNode(ARG1);
+    // If we have conditions already built, don't add ARG1
+    // This allows puzzles that build their own conditions to work correctly
+    if (this.nodes.length === 0) {
+      // No conditions built - return conditions from solution (arg1)
+      this.addNode(ARG1);
+    }
+    // Otherwise, the built conditions will be returned
     return this;
   }
   
@@ -696,9 +701,9 @@ export class PuzzleBuilder implements ConditionBuilder {
     if (format === 'chialisp') {
     const clspCode = serialize(tree, {
         indent: options?.indent,
-        useOpcodeConstants: options?.useOpcodeConstants ?? true,
       comments: this.comments,
-      blockComments: this.blockComments
+      blockComments: this.blockComments,
+      includedLibraries: this.includes
     });
     
     // Apply CLSP formatter if indent is true
@@ -854,8 +859,10 @@ export class PuzzleBuilder implements ConditionBuilder {
     if (nodes.length === 1) return nodes[0];
     
     // Build nested cons list
+    // Use CONS constant name if opcodes.clib is included
+    const consOperator = this.shouldUseSymbolicOpcodeConstant() ? sym('CONS') : CONS;
     return nodes.reduceRight((rest, node) => 
-      list([CONS, node, rest]), 
+      list([consOperator, node, rest]), 
       NIL
     );
   }
@@ -949,25 +956,17 @@ export class PuzzleBuilder implements ConditionBuilder {
   /**
    * Check if we should use symbolic condition code names
    */
-  private shouldUseSymbolicConditionCode(opcode: number): boolean {
-    // Check if condition_codes.clib is manually included
-    if (this.includes.some(inc => inc.includes('condition_codes'))) {
-      return true;
-    }
-    
-    // Check if it will be auto-included based on features
-    const conditionName = getConditionCodeName(opcode);
-    if (conditionName && this.featuresUsed.has(conditionName)) {
-      return true;
-    }
-    
-    // If any condition codes are used, we'll auto-include condition_codes.clib
-    return Array.from(this.featuresUsed).some(f => 
-      f.startsWith('CREATE_') || 
-      f.startsWith('ASSERT_') || 
-      f.startsWith('AGG_SIG_') ||
-      f === 'RESERVE_FEE'
-    );
+  private shouldUseSymbolicConditionCode(_opcode: number): boolean {
+    // Only use symbolic names if condition_codes.clib is manually included
+    return this.includes.some(inc => inc.includes('condition_codes'));
+  }
+  
+  /**
+   * Check if we should use symbolic opcode constant names
+   */
+  private shouldUseSymbolicOpcodeConstant(): boolean {
+    // Only use symbolic names if opcodes.clib is manually included
+    return this.includes.some(inc => inc.includes('opcodes.clib'));
   }
   
   /**

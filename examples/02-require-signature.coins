@@ -1,5 +1,7 @@
 // Example 02: Require Signature
 // Introduces basic security - only the holder of a private key can spend
+include condition_codes.clib
+include opcodes.clib
 
 coin RequireSignature {
     // Storage variables are immutable and become part of the puzzle hash
