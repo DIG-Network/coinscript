@@ -73,6 +73,12 @@ const config: Config = {
           label: "Requirements",
         },
         {
+          type: "docSidebar",
+          sidebarId: "coinscriptSidebar",
+          position: "left",
+          label: "CoinScript",
+        },
+        {
           href: "https://github.com/DIG-Network",
           label: "GitHub",
           position: "right",

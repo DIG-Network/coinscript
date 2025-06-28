@@ -121,6 +121,98 @@ export const CHIALISP_INCLUDES: Record<string, IncludeDefinition> = {
       'cat_mod_hash_hash_truth',
       'cat_tail_program_hash_truth'
     ]
+  },
+  
+  'opcodes.clib': {
+    path: 'opcodes.clib',
+    constants: {
+      // Core operators
+      QUOTE: 'q',
+      APPLY: 'a',
+      IF: 'i',
+      CONS: 'c',
+      FIRST: 'f',
+      REST: 'r',
+      LISTP: 'l',
+      RAISE: 'x',
+      EQ: '=',
+      
+      // Math operators
+      ADD: '+',
+      SUBTRACT: '-',
+      MULTIPLY: '*',
+      DIVIDE: '/',
+      DIVMOD: 'divmod',
+      GT: '>',
+      GTS: '>s',
+      
+      // Bit operations
+      ASH: 'ash',
+      LSH: 'lsh',
+      LOGAND: 'logand',
+      LOGIOR: 'logior',
+      LOGXOR: 'logxor',
+      LOGNOT: 'lognot',
+      
+      // Logic operations
+      NOT: 'not',
+      ANY: 'any',
+      ALL: 'all',
+      
+      // String/byte operations
+      STRLEN: 'strlen',
+      SUBSTR: 'substr',
+      CONCAT: 'concat',
+      
+      // Crypto operations
+      SHA256: 'sha256',
+      SHA256TREE: 'sha256tree',
+      SHA256TREE1: 'sha256tree1',
+      KECCAK256: 'keccak256',
+      COINID: 'coinid',
+      SECP256K1_VERIFY: 'secp256k1_verify',
+      SECP256R1_VERIFY: 'secp256r1_verify',
+      
+      // BLS operations
+      POINT_ADD: 'point_add',
+      PUBKEY_FOR_EXP: 'pubkey_for_exp',
+      G1_ADD: 'g1_add',
+      G1_SUBTRACT: 'g1_subtract',
+      G1_MULTIPLY: 'g1_multiply',
+      G1_NEGATE: 'g1_negate',
+      BLS_VERIFY: 'bls_verify',
+      
+      // Other operations
+      SOFTFORK: 'softfork',
+      ASSERT: 'assert',
+      IS_ERROR: 'is_error',
+      CONTAINS: 'contains',
+      
+      // Common macros and special forms
+      MOD: 'mod',
+      LAMBDA: 'lambda',
+      DEFUN: 'defun',
+      DEFMACRO: 'defmacro',
+      DEFCONST: 'defconst',
+      
+      // Environment references
+      ARG: '@',
+      ARG1: '1',
+      ARG2: '2',
+      ARG3: '3',
+      ARG4: '4',
+      ARG5: '5',
+      
+      // Numeric constants
+      ZERO: '0',
+      ONE: '1',
+      MINUS_ONE: '-1',
+      
+      // Common constants
+      NIL: '()',
+      TRUE: '1',
+      FALSE: '()'
+    }
   }
 };
 
@@ -186,6 +278,14 @@ export function determineRequiredIncludes(features: Set<string>): string[] {
   // Include CAT truths for CAT operations
   if (Array.from(features).some(f => f.includes('cat_'))) {
     includes.push('cat_truths.clib');
+  }
+  
+  // Include opcodes for CLVM operator constants
+  if (Array.from(features).some(f => {
+    const opcodeConstants = Object.keys(CHIALISP_INCLUDES['opcodes.clib'].constants || {});
+    return opcodeConstants.includes(f);
+  })) {
+    includes.push('opcodes.clib');
   }
   
   return includes;

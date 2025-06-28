@@ -1,0 +1,8 @@
+(mod (a b)
+  
+  (include opcodes.clib)
+  
+  ; Test using opcode constants
+  ; ADD instead of +
+  (ADD a b)
+)
