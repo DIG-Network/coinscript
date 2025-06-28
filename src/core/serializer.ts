@@ -21,6 +21,7 @@ import {
 export function serialize(node: TreeNode, options: SerializeOptions = {}): string {
   const {
     useKeywords = false,
+    useOpcodeConstants = false,
     hexPrefix = true,
     indent = false,
     indentString = '  ',
@@ -61,7 +62,11 @@ export function serialize(node: TreeNode, options: SerializeOptions = {}): strin
 
     // Number or bigint
     if (typeof value === 'number' || typeof value === 'bigint') {
-      // Check for keywords
+      // Check for keywords or opcode constants
+      if (useOpcodeConstants) {
+        const opcodeConstant = getOpcodeConstant(Number(value));
+        if (opcodeConstant) return opcodeConstant;
+      }
       if (useKeywords) {
         const keyword = getKeyword(Number(value));
         if (keyword) return keyword;
@@ -76,6 +81,14 @@ export function serialize(node: TreeNode, options: SerializeOptions = {}): strin
 
     // String (symbol)
     if (typeof value === 'string') {
+      // If useOpcodeConstants is enabled, check if this symbol should be replaced
+      if (useOpcodeConstants) {
+        const opcodeReplacement = getSymbolOpcodeConstant(value);
+        if (opcodeReplacement) {
+          return opcodeReplacement;
+        }
+      }
+      
       // Check if it needs quoting
       if (needsQuoting(value)) {
         return `"${escapeString(value)}"`;
@@ -385,4 +398,116 @@ function getKeyword(value: number): string | null {
   };
   
   return keywords[value] || null;
+}
+
+/**
+ * Get opcode constant name for operators (from opcodes.clib)
+ */
+function getOpcodeConstant(value: number): string | null {
+  const opcodeConstants: Record<number, string> = {
+    1: 'QUOTE',
+    2: 'APPLY',
+    3: 'IF',
+    4: 'CONS',
+    5: 'FIRST',
+    6: 'REST',
+    7: 'LISTP',
+    8: 'RAISE',
+    9: 'EQ',
+    10: 'GTS',
+    11: 'SHA256',
+    12: 'SUBSTR',
+    13: 'STRLEN',
+    14: 'CONCAT',
+    16: 'ADD',
+    17: 'SUBTRACT',
+    18: 'MULTIPLY',
+    19: 'DIVIDE',
+    20: 'DIVMOD',
+    21: 'GT',
+    22: 'ASH',
+    23: 'LSH',
+    24: 'LOGAND',
+    25: 'LOGIOR',
+    26: 'LOGXOR',
+    27: 'LOGNOT',
+    28: 'POINT_ADD',
+    29: 'PUBKEY_FOR_EXP',
+    30: 'NOT',
+    31: 'ANY',
+    32: 'ALL',
+    33: 'SOFTFORK',
+    34: 'SHA256TREE',
+    35: 'SHA256TREE1',
+    36: 'KECCAK256',
+    37: 'COINID',
+    38: 'SECP256K1_VERIFY',
+    39: 'SECP256R1_VERIFY',
+    48: 'G1_ADD',
+    49: 'G1_SUBTRACT',
+    50: 'G1_MULTIPLY',
+    51: 'G1_NEGATE',
+    52: 'BLS_VERIFY',
+    53: 'ASSERT',
+    54: 'IS_ERROR',
+    55: 'CONTAINS'
+  };
+  
+  return opcodeConstants[value] || null;
+}
+
+/**
+ * Get opcode constant replacement for symbol keywords
+ */
+function getSymbolOpcodeConstant(symbol: string): string | null {
+  const symbolToOpcode: Record<string, string> = {
+    'q': 'QUOTE',
+    'a': 'APPLY',
+    'i': 'IF',
+    'c': 'CONS',
+    'f': 'FIRST',
+    'r': 'REST',
+    'l': 'LISTP',
+    'x': 'RAISE',
+    '=': 'EQ',
+    '>s': 'GTS',
+    'sha256': 'SHA256',
+    'substr': 'SUBSTR',
+    'strlen': 'STRLEN',
+    'concat': 'CONCAT',
+    '+': 'ADD',
+    '-': 'SUBTRACT',
+    '*': 'MULTIPLY',
+    '/': 'DIVIDE',
+    'divmod': 'DIVMOD',
+    '>': 'GT',
+    'ash': 'ASH',
+    'lsh': 'LSH',
+    'logand': 'LOGAND',
+    'logior': 'LOGIOR',
+    'logxor': 'LOGXOR',
+    'lognot': 'LOGNOT',
+    'point_add': 'POINT_ADD',
+    'pubkey_for_exp': 'PUBKEY_FOR_EXP',
+    'not': 'NOT',
+    'any': 'ANY',
+    'all': 'ALL',
+    'softfork': 'SOFTFORK',
+    'sha256tree': 'SHA256TREE',
+    'sha256tree1': 'SHA256TREE1',
+    'keccak256': 'KECCAK256',
+    'coinid': 'COINID',
+    'secp256k1_verify': 'SECP256K1_VERIFY',
+    'secp256r1_verify': 'SECP256R1_VERIFY',
+    'g1_add': 'G1_ADD',
+    'g1_subtract': 'G1_SUBTRACT',
+    'g1_multiply': 'G1_MULTIPLY',
+    'g1_negate': 'G1_NEGATE',
+    'bls_verify': 'BLS_VERIFY',
+    'assert': 'ASSERT',
+    'is_error': 'IS_ERROR',
+    'contains': 'CONTAINS'
+  };
+  
+  return symbolToOpcode[symbol] || null;
 } 

@@ -696,6 +696,7 @@ export class PuzzleBuilder implements ConditionBuilder {
     if (format === 'chialisp') {
     const clspCode = serialize(tree, {
         indent: options?.indent,
+        useOpcodeConstants: options?.useOpcodeConstants ?? options?.indent,
       comments: this.comments,
       blockComments: this.blockComments
     });
@@ -1013,6 +1014,8 @@ export { Expression as Expr };
 export interface SerializeOptions {
   /** Whether to indent the output */
   indent?: boolean;
+  /** Whether to use opcode constants from opcodes.clib (defaults to same as indent) */
+  useOpcodeConstants?: boolean;
   /** Output format */
   format?: 'chialisp' | 'clvm' | 'hex' | 'modhash';
   /** Whether to compile to CLVM first (for clvm/hex/modhash formats) */

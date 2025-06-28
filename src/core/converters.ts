@@ -175,5 +175,5 @@ export function sourceToProgram(source: string): Program {
  */
 export function programToSource(program: Program, indent = false): string {
   const tree = programToTree(program);
-  return serialize(tree, { indent, useKeywords: true });
+  return serialize(tree, { indent, useKeywords: true, useOpcodeConstants: indent });
 } 
