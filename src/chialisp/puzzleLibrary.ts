@@ -85,9 +85,9 @@ export interface ChialispPuzzle {
 function getLibPath(): string {
   // Try different possible locations
   const possiblePaths = [
-    join(__dirname, '../../lib/chialisp'),
-    join(process.cwd(), 'lib/chialisp'),
-    join(__dirname, '../../../lib/chialisp')
+    join(__dirname, '..'),  // src/chialisp
+    join(process.cwd(), 'src/chialisp'),
+    join(__dirname, '../chialisp')
   ];
   
   for (const path of possiblePaths) {
@@ -96,7 +96,7 @@ function getLibPath(): string {
     }
   }
   
-  throw new Error('Could not find Chialisp puzzle library. Expected at lib/chialisp/');
+  throw new Error('Could not find Chialisp puzzle library. Expected at src/chialisp/');
 }
 
 /**

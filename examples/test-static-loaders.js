@@ -63,7 +63,7 @@ try {
 console.log('\n\n3. Loading existing NFT ownership layer:');
 console.log('─'.repeat(50));
 
-const nftPath = path.join(__dirname, '../lib/chialisp/nft/nft_ownership_layer.clsp');
+const nftPath = path.join(__dirname, '../src/chialisp/nft/nft_ownership_layer.clsp');
 if (fs.existsSync(nftPath)) {
     try {
         const nftPuzzle = PuzzleBuilder.fromClsp(nftPath);

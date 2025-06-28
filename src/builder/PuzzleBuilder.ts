@@ -696,7 +696,7 @@ export class PuzzleBuilder implements ConditionBuilder {
     if (format === 'chialisp') {
     const clspCode = serialize(tree, {
         indent: options?.indent,
-        useOpcodeConstants: options?.useOpcodeConstants ?? options?.indent,
+        useOpcodeConstants: options?.useOpcodeConstants ?? true,
       comments: this.comments,
       blockComments: this.blockComments
     });

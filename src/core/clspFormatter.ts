@@ -1,5 +1,5 @@
 /**
- * CLSP Formatter V4 - Professional ChiaLisp formatter matching lib/chialisp patterns
+ * CLSP Formatter V4 - Professional ChiaLisp formatter matching src/chialisp patterns
  * 
  * Features:
  * 1. Follows exact indentation patterns from official ChiaLisp code

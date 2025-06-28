@@ -21,7 +21,7 @@ import {
 export function serialize(node: TreeNode, options: SerializeOptions = {}): string {
   const {
     useKeywords = false,
-    useOpcodeConstants = false,
+    useOpcodeConstants = true,
     hexPrefix = true,
     indent = false,
     indentString = '  ',
