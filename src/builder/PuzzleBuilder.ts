@@ -19,11 +19,15 @@ import { formatCLSP } from '../core/clspFormatter';
 import { 
   IF, CONS, ADD, SUBTRACT, MULTIPLY, DIVIDE, GT, GTS, EQ, NOT,
   SHA256, SHA256TREE1, APPLY, QUOTE, ARG, ARG1, ARG2, ARG3,
-  ALL, ANY, NIL, MOD, RAISE
+  ALL, ANY, NIL, MOD
 } from '../core/opcodes';
 import { Program } from 'clvm-lib';
 import { readFileSync } from 'fs';
 import { parseChialisp } from '../chialisp/parser';
+import { 
+  determineRequiredIncludes, 
+  getConditionCodeName
+} from '../chialisp/includeIndex';
 
 // Type-safe condition builders
 export interface ConditionBuilder {
@@ -155,6 +159,7 @@ export class PuzzleBuilder implements ConditionBuilder {
   private includes: string[] = []; // Library includes
   private comments: Map<TreeNode, string> = new Map(); // Comments for nodes
   private blockComments: string[] = []; // Block comments to add before the body
+  private featuresUsed: Set<string> = new Set(); // Track features for auto-includes
   
   // === MOD STRUCTURE SUPPORT ===
   
@@ -270,8 +275,11 @@ export class PuzzleBuilder implements ConditionBuilder {
   // === COIN OPERATIONS ===
   
   createCoin(puzzleHash: string | Uint8Array, amount: number | bigint | Expression, memo?: string | Uint8Array): PuzzleBuilder {
-    // Use symbolic name if condition codes are included
-    const opcodeExpr = this.includes.includes('condition_codes.clvm') || this.includes.includes('condition_codes.clib')
+    // Track feature usage
+    this.featuresUsed.add('CREATE_COIN');
+    
+    // Use symbolic name if condition codes are included or will be auto-included
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(51)
       ? sym('CREATE_COIN')
       : int(51);
     
@@ -303,8 +311,11 @@ export class PuzzleBuilder implements ConditionBuilder {
   // === SIGNATURES ===
   
   requireSignature(pubkey: string | Uint8Array, message?: Expression): PuzzleBuilder {
+    // Track feature usage
+    this.featuresUsed.add('AGG_SIG_ME');
+    
     const msg = message || new Expression(list([SHA256TREE1, ARG1]));
-    const opcodeExpr = this.includes.includes('condition_codes.clvm') || this.includes.includes('condition_codes.clib')
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(50)
       ? sym('AGG_SIG_ME')
       : int(50);
     const condition = list([
@@ -321,8 +332,14 @@ export class PuzzleBuilder implements ConditionBuilder {
   }
   
   requireSignatureUnsafe(pubkey: string | Uint8Array, message: Expression): PuzzleBuilder {
+    // Track feature usage
+    this.featuresUsed.add('AGG_SIG_UNSAFE');
+    
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(49)
+      ? sym('AGG_SIG_UNSAFE')
+      : int(49);
     const condition = list([
-      int(49), // AGG_SIG_UNSAFE
+      opcodeExpr,
       toTree(pubkey),
       message.tree
     ]);
@@ -333,25 +350,41 @@ export class PuzzleBuilder implements ConditionBuilder {
   // === TIME LOCKS ===
   
   requireAfterSeconds(seconds: number | Expression): PuzzleBuilder {
-    const condition = list([int(80), toTree(seconds)]); // ASSERT_SECONDS_RELATIVE
+    this.featuresUsed.add('ASSERT_SECONDS_RELATIVE');
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(80)
+      ? sym('ASSERT_SECONDS_RELATIVE')
+      : int(80);
+    const condition = list([opcodeExpr, toTree(seconds)]);
     this.addNode(condition);
     return this;
   }
   
   requireAfterHeight(height: number | Expression): PuzzleBuilder {
-    const condition = list([int(82), toTree(height)]); // ASSERT_HEIGHT_RELATIVE
+    this.featuresUsed.add('ASSERT_HEIGHT_RELATIVE');
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(82)
+      ? sym('ASSERT_HEIGHT_RELATIVE')
+      : int(82);
+    const condition = list([opcodeExpr, toTree(height)]);
     this.addNode(condition);
     return this;
   }
   
   requireBeforeSeconds(seconds: number | Expression): PuzzleBuilder {
-    const condition = list([int(83), toTree(seconds)]); // ASSERT_BEFORE_SECONDS_RELATIVE
+    this.featuresUsed.add('ASSERT_SECONDS_ABSOLUTE');
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(81)
+      ? sym('ASSERT_SECONDS_ABSOLUTE')
+      : int(81);
+    const condition = list([opcodeExpr, toTree(seconds)]);
     this.addNode(condition);
     return this;
   }
   
   requireBeforeHeight(height: number | Expression): PuzzleBuilder {
-    const condition = list([int(85), toTree(height)]); // ASSERT_BEFORE_HEIGHT_RELATIVE
+    this.featuresUsed.add('ASSERT_HEIGHT_ABSOLUTE');
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(83)
+      ? sym('ASSERT_HEIGHT_ABSOLUTE')
+      : int(83);
+    const condition = list([opcodeExpr, toTree(height)]);
     this.addNode(condition);
     return this;
   }
@@ -359,7 +392,11 @@ export class PuzzleBuilder implements ConditionBuilder {
   // === FEES ===
   
   reserveFee(amount: number | bigint | Expression): PuzzleBuilder {
-    const condition = list([int(52), toTree(amount)]); // RESERVE_FEE
+    this.featuresUsed.add('RESERVE_FEE');
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(52)
+      ? sym('RESERVE_FEE')
+      : int(52);
+    const condition = list([opcodeExpr, toTree(amount)]);
     this.addNode(condition);
     return this;
   }
@@ -367,7 +404,8 @@ export class PuzzleBuilder implements ConditionBuilder {
   // === ANNOUNCEMENTS ===
   
   createAnnouncement(message: string | Uint8Array): PuzzleBuilder {
-    const opcodeExpr = this.includes.includes('condition_codes.clvm') || this.includes.includes('condition_codes.clib')
+    this.featuresUsed.add('CREATE_COIN_ANNOUNCEMENT');
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(60)
       ? sym('CREATE_COIN_ANNOUNCEMENT')
       : int(60);
     const condition = list([opcodeExpr, toTree(message)]);
@@ -376,7 +414,11 @@ export class PuzzleBuilder implements ConditionBuilder {
   }
   
   assertAnnouncement(announcementId: string | Uint8Array): PuzzleBuilder {
-    const condition = list([int(61), toTree(announcementId)]); // ASSERT_COIN_ANNOUNCEMENT
+    this.featuresUsed.add('ASSERT_COIN_ANNOUNCEMENT');
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(61)
+      ? sym('ASSERT_COIN_ANNOUNCEMENT')
+      : int(61);
+    const condition = list([opcodeExpr, toTree(announcementId)]);
     this.addNode(condition);
     return this;
   }
@@ -384,13 +426,21 @@ export class PuzzleBuilder implements ConditionBuilder {
   // === ASSERTIONS ===
   
   assertMyPuzzleHash(hash: string | Uint8Array): PuzzleBuilder {
-    const condition = list([int(70), toTree(hash)]); // ASSERT_MY_PUZZLEHASH
+    this.featuresUsed.add('ASSERT_MY_PUZZLEHASH');
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(72)
+      ? sym('ASSERT_MY_PUZZLEHASH')
+      : int(72);
+    const condition = list([opcodeExpr, toTree(hash)]);
     this.addNode(condition);
     return this;
   }
   
   assertMyCoinId(id: string | Uint8Array): PuzzleBuilder {
-    const condition = list([int(74), toTree(id)]); // ASSERT_MY_COIN_ID
+    this.featuresUsed.add('ASSERT_MY_COIN_ID');
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(70)
+      ? sym('ASSERT_MY_COIN_ID')
+      : int(70);
+    const condition = list([opcodeExpr, toTree(id)]);
     this.addNode(condition);
     return this;
   }
@@ -398,31 +448,14 @@ export class PuzzleBuilder implements ConditionBuilder {
   // === RAW CONDITIONS ===
   
   addCondition(opcode: number, ...args: (Expression | string | number | Uint8Array)[]): PuzzleBuilder {
-    // Map of opcodes to their symbolic names from condition_codes.clib
-    const opcodeNames: Record<number, string> = {
-      1: 'REMARK',
-      49: 'AGG_SIG_UNSAFE',
-      50: 'AGG_SIG_ME',
-      51: 'CREATE_COIN',
-      52: 'RESERVE_FEE',
-      60: 'CREATE_COIN_ANNOUNCEMENT',
-      61: 'ASSERT_COIN_ANNOUNCEMENT',
-      62: 'CREATE_PUZZLE_ANNOUNCEMENT',
-      63: 'ASSERT_PUZZLE_ANNOUNCEMENT',
-      70: 'ASSERT_MY_COIN_ID',
-      71: 'ASSERT_MY_PARENT_ID',
-      72: 'ASSERT_MY_PUZZLEHASH',
-      73: 'ASSERT_MY_AMOUNT',
-      80: 'ASSERT_SECONDS_RELATIVE',
-      81: 'ASSERT_SECONDS_ABSOLUTE',
-      82: 'ASSERT_HEIGHT_RELATIVE',
-      83: 'ASSERT_HEIGHT_ABSOLUTE'
-    };
+    // Get symbolic name if available
+    const conditionName = getConditionCodeName(opcode);
+    if (conditionName) {
+      this.featuresUsed.add(conditionName);
+    }
     
-    // Use symbolic name if condition codes are included and we have a name for this opcode
-    const hasConditionCodes = this.includes.includes('condition_codes.clvm') || this.includes.includes('condition_codes.clib');
-    const opcodeExpr = hasConditionCodes && opcodeNames[opcode]
-      ? sym(opcodeNames[opcode])
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(opcode) && conditionName
+      ? sym(conditionName)
       : int(opcode);
       
     const condition = list([opcodeExpr, ...args.map(toTree)]);
@@ -537,12 +570,13 @@ export class PuzzleBuilder implements ConditionBuilder {
   // === UTILITIES ===
   
   require(condition: Expression, _message?: string): PuzzleBuilder {
-    // Assert condition is true using (if (not condition) (x) ())
+    // Track usage of assert macro
+    this.featuresUsed.add('assert');
+    
+    // Use the assert macro from utility_macros.clib
     const assertion = list([
-      IF,
-      list([NOT, condition.tree]),
-      list([RAISE]),  // Raise exception if condition is false
-      NIL  // Do nothing if condition is true
+      sym('assert'),
+      condition.tree
     ]);
     this.addNode(assertion);
     return this;
@@ -578,6 +612,9 @@ export class PuzzleBuilder implements ConditionBuilder {
     if (this.currentContext !== 'main') {
       throw new Error('Incomplete control flow - missing else() or build()');
     }
+    
+    // Auto-include required files
+    this.autoInclude();
     
     // If we have a custom mod (e.g., from loaded Chialisp), use it
     if (this.customMod) {
@@ -897,6 +934,44 @@ export class PuzzleBuilder implements ConditionBuilder {
       return result.mainPuzzle;
     } catch (error) {
       throw new Error(`Failed to load CoinScript file ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Check if we should use symbolic condition code names
+   */
+  private shouldUseSymbolicConditionCode(opcode: number): boolean {
+    // Check if condition_codes.clib is manually included
+    if (this.includes.some(inc => inc.includes('condition_codes'))) {
+      return true;
+    }
+    
+    // Check if it will be auto-included based on features
+    const conditionName = getConditionCodeName(opcode);
+    if (conditionName && this.featuresUsed.has(conditionName)) {
+      return true;
+    }
+    
+    // If any condition codes are used, we'll auto-include condition_codes.clib
+    return Array.from(this.featuresUsed).some(f => 
+      f.startsWith('CREATE_') || 
+      f.startsWith('ASSERT_') || 
+      f.startsWith('AGG_SIG_') ||
+      f === 'RESERVE_FEE'
+    );
+  }
+  
+  /**
+   * Automatically determine and add required includes based on features used
+   */
+  private autoInclude(): void {
+    const requiredIncludes = determineRequiredIncludes(this.featuresUsed);
+    
+    // Add auto-determined includes that aren't already manually included
+    for (const include of requiredIncludes) {
+      if (!this.includes.includes(include)) {
+        this.includes.push(include);
+      }
     }
   }
 }

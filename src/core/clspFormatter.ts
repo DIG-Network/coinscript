@@ -84,7 +84,7 @@ export class CLSPFormatter {
         }
         continue;
       }
-
+      
       // Comments
       if (text[pos] === ';') {
         const start = pos;
@@ -176,7 +176,7 @@ export class CLSPFormatter {
           idx++; // Skip closing paren
           break;
         }
-
+        
         if (tokens[idx].type === TokenType.NEWLINE) {
           elements.push({ type: 'newline' });
           idx++;
@@ -197,7 +197,7 @@ export class CLSPFormatter {
         }
 
         const elem = this.parseExpression(tokens, idx);
-        if (elem) {
+          if (elem) {
           if (elements.filter(e => e.type !== 'newline' && e.type !== 'comment').length === 0 && elem.type === 'atom') {
             specialForm = elem.value;
           }
@@ -222,7 +222,7 @@ export class CLSPFormatter {
         };
         idx = checkIdx + 1;
       }
-
+      
       return {
         type: 'list',
         elements,
@@ -556,7 +556,7 @@ export class CLSPFormatter {
     
     if (hasMultiLine) return null;
     
-    return result;
+        return result;
   }
 
   private formatMultiLine(expr: ParsedExpression, indent: number, specialIndent?: SpecialIndent): string {
