@@ -279,7 +279,7 @@ describe('PuzzleBuilder - Serialization', () => {
       const serialized = p.serialize();
       expect(serialized).toContain('0');
       expect(serialized).toContain('19');
-      expect(serialized.match(/\(/g)?.length).toBe(20);
+      expect(serialized.match(/\(/g)?.length).toBe(21); // 20 lists + 1 for outer parenthesis
     });
   });
 

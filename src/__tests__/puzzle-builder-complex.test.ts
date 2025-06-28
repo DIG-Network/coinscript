@@ -319,7 +319,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
       
       const serialized = p.serialize();
       expect(serialized).toContain('sha256');
-      expect(serialized).toContain('/'); // divide
+      expect(serialized).toContain('all'); // and operator for both conditions
     });
 
     test('should build payment channel puzzle', () => {
