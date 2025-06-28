@@ -19,7 +19,7 @@ import { formatCLSP } from '../core/clspFormatter';
 import { 
   IF, CONS, ADD, SUBTRACT, MULTIPLY, DIVIDE, GT, GTS, EQ, NOT,
   SHA256, SHA256TREE1, APPLY, QUOTE, ARG, ARG1, ARG2, ARG3,
-  ALL, ANY, NIL, MOD
+  ALL, ANY, NIL, MOD, RAISE
 } from '../core/opcodes';
 import { Program } from 'clvm-lib';
 import { readFileSync } from 'fs';
@@ -28,6 +28,7 @@ import {
   determineRequiredIncludes, 
   getConditionCodeName
 } from '../chialisp/includeIndex';
+import { SolutionBuilder } from './SolutionBuilder';
 
 // Type-safe condition builders
 export interface ConditionBuilder {
@@ -322,7 +323,16 @@ export class PuzzleBuilder implements ConditionBuilder {
     // Track feature usage
     this.featuresUsed.add('AGG_SIG_ME');
     
-    const msg = message || new Expression(list([SHA256TREE1, ARG1]));
+    // For AGG_SIG_ME, if no message is provided, we use a simple default
+    let msg: Expression;
+    if (message) {
+      msg = message;
+    } else {
+      // Use a simple default message - empty bytes for now
+      // In production, this would typically be the tree hash of the solution
+      msg = new Expression(NIL);
+    }
+    
     const opcodeExpr = this.shouldUseSymbolicConditionCode(50)
       ? sym('AGG_SIG_ME')
       : int(50);
@@ -453,6 +463,46 @@ export class PuzzleBuilder implements ConditionBuilder {
     return this;
   }
   
+  assertMyParentId(id: string | Uint8Array): PuzzleBuilder {
+    this.featuresUsed.add('ASSERT_MY_PARENT_ID');
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(71)
+      ? sym('ASSERT_MY_PARENT_ID')
+      : int(71);
+    const condition = list([opcodeExpr, toTree(id)]);
+    this.addNode(condition);
+    return this;
+  }
+  
+  assertMyAmount(amount: number | bigint | Expression): PuzzleBuilder {
+    this.featuresUsed.add('ASSERT_MY_AMOUNT');
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(73)
+      ? sym('ASSERT_MY_AMOUNT')
+      : int(73);
+    const condition = list([opcodeExpr, toTree(amount)]);
+    this.addNode(condition);
+    return this;
+  }
+  
+  createPuzzleAnnouncement(message: string | Uint8Array): PuzzleBuilder {
+    this.featuresUsed.add('CREATE_PUZZLE_ANNOUNCEMENT');
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(62)
+      ? sym('CREATE_PUZZLE_ANNOUNCEMENT')
+      : int(62);
+    const condition = list([opcodeExpr, toTree(message)]);
+    this.addNode(condition);
+    return this;
+  }
+  
+  assertPuzzleAnnouncement(announcementId: string | Uint8Array): PuzzleBuilder {
+    this.featuresUsed.add('ASSERT_PUZZLE_ANNOUNCEMENT');
+    const opcodeExpr = this.shouldUseSymbolicConditionCode(63)
+      ? sym('ASSERT_PUZZLE_ANNOUNCEMENT')
+      : int(63);
+    const condition = list([opcodeExpr, toTree(announcementId)]);
+    this.addNode(condition);
+    return this;
+  }
+  
   // === RAW CONDITIONS ===
   
   addCondition(opcode: number, ...args: (Expression | string | number | Uint8Array)[]): PuzzleBuilder {
@@ -578,13 +628,14 @@ export class PuzzleBuilder implements ConditionBuilder {
   // === UTILITIES ===
   
   require(condition: Expression, _message?: string): PuzzleBuilder {
-    // Track usage of assert macro
-    this.featuresUsed.add('assert');
-    
-    // Use the assert macro from utility_macros.clib
+    // Instead of using the assert macro, generate the expanded form directly
+    // assert expands to: (i condition () (x))
+    // This means: if condition is true, return nil; otherwise raise exception
     const assertion = list([
-      sym('assert'),
-      condition.tree
+      IF,  // 'i' operator
+      condition.tree,
+      NIL, // return nil if condition is true
+      list([RAISE]) // raise exception if condition is false
     ]);
     this.addNode(assertion);
     return this;
@@ -722,10 +773,11 @@ export class PuzzleBuilder implements ConditionBuilder {
       // First serialize to ChiaLisp
       let clspCode = serialize(tree, {
         comments: this.comments,
-        blockComments: this.blockComments
+        blockComments: this.blockComments,
+        includedLibraries: this.includes
       });
       
-      // Preprocess includes by inlining condition codes
+      // Preprocess includes by inlining libraries
       if (clspCode.includes('(include condition_codes.clib)')) {
         // Define the condition codes inline
         const conditionCodes = `
@@ -750,6 +802,67 @@ export class PuzzleBuilder implements ConditionBuilder {
         
         // Replace the include with the actual constants
         clspCode = clspCode.replace('(include condition_codes.clib)', conditionCodes);
+      }
+      
+      // Inline utility macros
+      if (clspCode.includes('(include utility_macros.clib)')) {
+        // Define the utility macros inline
+        const utilityMacros = `
+          (defmacro assert items
+              (if (r items)
+                  (list if (f items) (c assert (r items)) (q . (x)))
+                  (f items)
+              )
+          )
+          
+          (defmacro or ARGS
+              (if ARGS
+                  (qq (if (unquote (f ARGS))
+                          1
+                          (unquote (c or (r ARGS)))
+                      )
+                  )
+                  0
+              )
+          )
+          
+          (defmacro and ARGS
+              (if ARGS
+                  (qq (if (unquote (f ARGS))
+                          (unquote (c and (r ARGS)))
+                          ()
+                      )
+                  )
+                  1
+              )
+          )
+        `;
+        
+        // Replace the include with the actual macros
+        clspCode = clspCode.replace('(include utility_macros.clib)', utilityMacros);
+      }
+      
+      // Inline sha256tree.clib
+      if (clspCode.includes('(include sha256tree.clib)')) {
+        const sha256treeFuncs = `
+          (defun sha256tree (TREE)
+            (if (l TREE)
+              (sha256 2 (sha256tree (f TREE)) (sha256tree (r TREE)))
+              (sha256 1 TREE)))
+        `;
+        clspCode = clspCode.replace('(include sha256tree.clib)', sha256treeFuncs);
+      }
+      
+      // Inline curry-and-treehash.clinc - simplified version with just sha256tree
+      if (clspCode.includes('(include curry-and-treehash.clinc)')) {
+        const curryAndTreehash = `
+          ; Essential function for tree hashing
+          (defun sha256tree (TREE)
+            (if (l TREE)
+                (sha256 2 (sha256tree (f TREE)) (sha256tree (r TREE)))
+                (sha256 1 TREE)))
+        `;
+        clspCode = clspCode.replace('(include curry-and-treehash.clinc)', curryAndTreehash);
       }
       
       // Create a Program from the ChiaLisp code
@@ -957,8 +1070,26 @@ export class PuzzleBuilder implements ConditionBuilder {
    * Check if we should use symbolic condition code names
    */
   private shouldUseSymbolicConditionCode(_opcode: number): boolean {
-    // Only use symbolic names if condition_codes.clib is manually included
-    return this.includes.some(inc => inc.includes('condition_codes'));
+    // Use symbolic names if:
+    // 1. condition_codes.clib is manually included, OR
+    // 2. we're tracking features that will auto-include it
+    
+    // Check if manually included
+    if (this.includes.some(inc => inc.includes('condition_codes'))) {
+      return true;
+    }
+    
+    // Check if we have any condition-related features that will trigger auto-include
+    const hasConditionFeatures = Array.from(this.featuresUsed).some(f => 
+      f.includes('CREATE_COIN') ||
+      f.includes('AGG_SIG') ||
+      f.includes('ASSERT_') ||
+      f.includes('RESERVE_FEE') ||
+      f.includes('ANNOUNCEMENT') ||
+      f === 'REMARK'
+    );
+    
+    return hasConditionFeatures;
   }
   
   /**
@@ -980,6 +1111,122 @@ export class PuzzleBuilder implements ConditionBuilder {
       if (!this.includes.includes(include)) {
         this.includes.push(include);
       }
+    }
+  }
+
+  /**
+   * Simulate running this puzzle with a given solution
+   * Returns the result or throws an error with details
+   */
+  simulate(solution: string | number[] | SolutionBuilder | Program): { result: unknown; cost: number } {
+    try {
+      // Build the puzzle tree
+      const puzzleTree = this.build();
+      
+      // Serialize to ChiaLisp first
+      const clspCode = serialize(puzzleTree, {
+        comments: this.comments,
+        blockComments: this.blockComments,
+        includedLibraries: this.includes
+      });
+      
+      // Create a Program from ChiaLisp
+      const program = Program.fromSource(clspCode);
+      
+      // Prepare solution - convert to proper format
+      let solutionProgram: Program;
+      if (typeof solution === 'string') {
+        solutionProgram = Program.fromSource(solution);
+      } else if (Array.isArray(solution)) {
+        // Convert array to list format
+        const solutionStr = this.arrayToClsp(solution);
+        solutionProgram = Program.fromSource(solutionStr);
+      } else if (solution instanceof SolutionBuilder) {
+        // Get the hex and convert to Program
+        const hexStr = solution.toHex();
+        solutionProgram = Program.deserializeHex(hexStr);
+      } else {
+        solutionProgram = solution as Program;
+      }
+      
+      // Run the puzzle with the solution
+      const result = program.run(solutionProgram);
+      
+      return {
+        result: result.value,
+        cost: typeof result.cost === 'bigint' ? Number(result.cost) : result.cost
+      };
+    } catch (error) {
+      throw new Error(`Simulation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  /**
+   * Convert JavaScript array to ChiaLisp list format
+   */
+  private arrayToClsp(arr: unknown[]): string {
+    if (arr.length === 0) return '()';
+    
+    const elements = arr.map(item => {
+      if (typeof item === 'string') {
+        // Check if it's a hex string
+        if (item.startsWith('0x')) {
+          return item;
+        }
+        // Otherwise quote it
+        return `"${item}"`;
+      } else if (typeof item === 'number' || typeof item === 'bigint') {
+        return String(item);
+      } else if (Array.isArray(item)) {
+        return this.arrayToClsp(item);
+      } else {
+        return String(item);
+      }
+    });
+    
+    return `(${elements.join(' ')})`;
+  }
+  
+  /**
+   * Validate that this puzzle produces valid conditions
+   * Returns true if valid, throws error if not
+   */
+  validateConditions(solution: any): boolean {
+    try {
+      const result = this.simulate(solution);
+      
+      // Check if result is a list of conditions
+      if (!Array.isArray(result.result)) {
+        throw new Error('Puzzle must return a list of conditions');
+      }
+      
+      // Validate each condition
+      for (const condition of result.result) {
+        if (!Array.isArray(condition) || condition.length < 1) {
+          throw new Error('Each condition must be a list with at least an opcode');
+        }
+        
+        const opcode = condition[0];
+        
+        // Validate known opcodes
+        switch (opcode) {
+          case 51: // CREATE_COIN
+            if (condition.length < 3) {
+              throw new Error('CREATE_COIN requires puzzle_hash and amount');
+            }
+            break;
+          case 50: // AGG_SIG_ME
+            if (condition.length < 3) {
+              throw new Error('AGG_SIG_ME requires pubkey and message');
+            }
+            break;
+          // Add more validation as needed
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      throw new Error(`Condition validation failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

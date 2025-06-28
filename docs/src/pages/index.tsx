@@ -13,9 +13,7 @@ function HomepageHeader() {
     <header
       className={clsx('hero hero--primary', styles.heroBanner)}
       style={{
-        backgroundImage: 'url(/img/planet-wide-banner.png)',
-        backgroundSize: 'cover', // Ensures the image covers the whole div
-        backgroundPosition: 'center', // Centers the image
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       }}
     >
       <div className="container">
@@ -25,9 +23,9 @@ function HomepageHeader() {
         <p className="hero__subtitle text-white">{siteConfig.tagline}</p>
         <div className={styles.buttons}>
           <Link
-            className="button button--lg rounded-3xl bg-gradient-to-r from-indigo-500 from-0% via-purple-500 via-50% to-pink-500 to-100%"
+            className="button button--lg rounded-3xl bg-white text-purple-700 hover:bg-gray-100"
             to="/docs/intro">
-            Get Started
+            Get Started with CoinScript
           </Link>
         </div>
       </div>
@@ -39,8 +37,8 @@ export default function Home(): JSX.Element {
   const {siteConfig} = useDocusaurusContext();
   return (
     <Layout
-      title={siteConfig.title}
-      description="DIG Network Documentation">
+      title={`${siteConfig.title} - ${siteConfig.tagline}`}
+      description="CoinScript is a high-level language that compiles to ChiaLisp, making Chia blockchain development accessible to developers familiar with modern programming languages.">
       <HomepageHeader />
       <main>
         <HomepageFeatures />

@@ -241,22 +241,29 @@ export const CONDITION_CODES: Record<number, string> = {
 
 /**
  * Determine which includes are needed based on features used
- * Note: condition_codes.clib is NOT auto-included - users must explicitly include it
  */
 export function determineRequiredIncludes(features: Set<string>): string[] {
   const includes: string[] = [];
   
-  // Do NOT auto-include condition_codes.clib
-  // Users must explicitly include it if they want symbolic condition names
-  
-  // Include sha256tree if tree hashing is used
-  if (features.has('sha256tree')) {
-    includes.push('sha256tree.clib');
+  // Include curry-and-treehash.clinc only when sha256tree or curry functions are needed
+  if (features.has('sha256tree') || features.has('curry') || features.has('treehash') ||
+      features.has('AGG_SIG_ME') || features.has('AGG_SIG_UNSAFE')) {
+    includes.push('curry-and-treehash.clinc');
   }
   
-  // Include curry and treehash for currying operations
-  if (features.has('curry') || features.has('puzzle-hash-of-curried-function')) {
-    includes.push('curry-and-treehash.clinc');
+  // Auto-include condition_codes.clib if any condition features are used
+  const conditionFeatures = Array.from(features).filter(f => 
+    CONDITION_CODES[parseInt(f)] || // Numeric condition code
+    Object.values(CONDITION_CODES).includes(f) || // Condition name
+    f.includes('CREATE_COIN') ||
+    f.includes('AGG_SIG') ||
+    f.includes('ASSERT_') ||
+    f.includes('RESERVE_FEE') ||
+    f.includes('ANNOUNCEMENT')
+  );
+  
+  if (conditionFeatures.length > 0) {
+    includes.push('condition_codes.clib');
   }
   
   // Include utility macros if assert, or, and are used
@@ -274,8 +281,16 @@ export function determineRequiredIncludes(features: Set<string>): string[] {
     includes.push('cat_truths.clib');
   }
   
-  // Do NOT auto-include opcodes.clib
-  // Users must explicitly include it if they want operator constants
+  // Auto-include opcodes.clib for string operations and other built-in functions
+  const opcodeFeatures = [
+    'strlen', 'substr', 'concat', 'sha256', 'keccak256', 'coinid',
+    'point_add', 'pubkey_for_exp', 'g1_add', 'bls_verify',
+    'quote', 'apply', 'all', 'any', 'not'
+  ];
+  
+  if (opcodeFeatures.some(f => features.has(f))) {
+    includes.push('opcodes.clib');
+  }
   
   return includes;
 }

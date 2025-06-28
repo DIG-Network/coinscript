@@ -3,27 +3,24 @@ import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
-  title: "DIG Network",
-  tagline: "The new standard for decentralized content delivery",
+  title: "CoinScript",
+  tagline: "High Level ChiaLisp Transcompiler",
   favicon: "img/favicon.ico",
 
   // Set the production url of your site here
-  url: "https://docs.dig.net",
+  url: "https://coinscript.dev",
   // Set the /<baseUrl>/ pathname under which your site is served
-  // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: process.env.BASE_URL || '/',
 
   // GitHub pages deployment config.
-  // If you aren't using GitHub pages, you don't need these.
-  organizationName: "DIG-Network", // Usually your GitHub org/user name.
-  projectName: "dig-network", // Usually your repo name.
+  organizationName: "chia-blockchain", // Update with your org
+  projectName: "chia-puzzle-framework", // Update with your repo
 
-  onBrokenLinks: "throw",
+  onBrokenLinks: "warn",
   onBrokenMarkdownLinks: "warn",
 
   // Even if you don't use internationalization, you can use this field to set
-  // useful metadata like html lang. For example, if your site is Chinese, you
-  // may want to replace "en" with "zh-Hans".
+  // useful metadata like html lang.
   i18n: {
     defaultLocale: "en",
     locales: ["en"],
@@ -35,10 +32,9 @@ const config: Config = {
       {
         docs: {
           sidebarPath: "./sidebars.ts",
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
+          // Update this to your repo
           editUrl:
-            "https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/",
+            "https://github.com/chia-blockchain/chia-puzzle-framework/tree/main/docs/",
         },
         theme: {
           customCss: "./src/css/custom.css",
@@ -50,13 +46,15 @@ const config: Config = {
   themeConfig: {
     // Replace with your project's social card
     colorMode: {
-      defaultMode: 'dark'
+      defaultMode: 'dark',
+      disableSwitch: false,
+      respectPrefersColorScheme: true,
     },
-    image: "img/dig-network-social-card.png",
+    image: "img/coinscript-social-card.png",
     navbar: {
-      title: "DIG Network",
+      title: "CoinScript",
       logo: {
-        alt: "My Site Logo",
+        alt: "CoinScript Logo",
         src: "img/logo.svg",
       },
       items: [
@@ -64,22 +62,10 @@ const config: Config = {
           type: "docSidebar",
           sidebarId: "tutorialSidebar",
           position: "left",
-          label: "White Paper",
+          label: "Documentation",
         },
         {
-          type: "docSidebar",
-          sidebarId: "implementationSidebar",
-          position: "left",
-          label: "Requirements",
-        },
-        {
-          type: "docSidebar",
-          sidebarId: "coinscriptSidebar",
-          position: "left",
-          label: "CoinScript",
-        },
-        {
-          href: "https://github.com/DIG-Network",
+          href: "https://github.com/chia-blockchain/chia-puzzle-framework",
           label: "GitHub",
           position: "right",
         },
@@ -90,35 +76,56 @@ const config: Config = {
       style: "dark",
       links: [
         {
-          title: "Docs",
+          title: "Documentation",
           items: [
             {
-              label: "White Paper",
+              label: "Introduction",
               to: "/docs/intro",
+            },
+            {
+              label: "CoinScript Reference",
+              to: "/docs/coinscript/reference",
+            },
+            {
+              label: "PuzzleBuilder Guide",
+              to: "/docs/coinscript/puzzle-solution-builder",
             },
           ],
         },
         {
           title: "Community",
-          items: [],
+          items: [
+            {
+              label: "Chia Developer Forum",
+              href: "https://developers.chia.net",
+            },
+            {
+              label: "Discord",
+              href: "https://discord.gg/chia",
+            },
+          ],
         },
         {
           title: "More",
           items: [
             {
               label: "GitHub",
-              href: "https://github.com/facebook/docusaurus",
+              href: "https://github.com/chia-blockchain/chia-puzzle-framework",
+            },
+            {
+              label: "Chia Network",
+              href: "https://www.chia.net",
             },
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} DIG Network (dig.net). Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} CoinScript. Built with Docusaurus.`,
     },
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
+      additionalLanguages: ['lisp', 'clojure'], // For ChiaLisp syntax highlighting
     },
-    customCss: require.resolve('./src/css/custom.css'),
   } satisfies Preset.ThemeConfig,
 };
 

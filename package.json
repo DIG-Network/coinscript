@@ -41,6 +41,7 @@
     "bls-signatures": "^2.0.3",
     "buffer": "^6.0.3",
     "chevrotain": "^11.0.3",
+    "chia-wallet-sdk": "^0.27.0",
     "clvm-lib": "^1.0.1",
     "crypto-js": "^4.2.0",
     "js-sha256": "^0.10.1",

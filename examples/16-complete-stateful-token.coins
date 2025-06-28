@@ -1,0 +1,109 @@
+// Complete Stateful Token Example
+// Demonstrates proper state management following ChiaLisp coin chain pattern
+
+// State is managed through linear coin chains where each coin:
+// 1. Carries state curried into its puzzle hash
+// 2. Destroys itself when spent
+// 3. Creates a successor coin with updated state
+
+coin StatefulToken {
+  // Immutable storage - curried into puzzle hash
+  storage creator: address;
+  storage tokenName: string = "MyToken";
+  storage tokenSymbol: string = "MTK";
+  
+  // State block defines mutable state structure
+  // This will be managed through coin chains
+  state {
+    uint256 totalSupply;
+    mapping(address => uint256) balances;
+    mapping(address => mapping(address => uint256)) allowances;
+  }
+  
+  // Events are emitted as puzzle announcements
+  event Transfer(address indexed from, address indexed to, uint256 value);
+  event Approval(address indexed owner, address indexed spender, uint256 value);
+  event Mint(address indexed to, uint256 value);
+  
+  // Constructor initializes the first coin in the chain (eve coin)
+  constructor(uint256 initialSupply) {
+    state.totalSupply = initialSupply;
+    state.balances[msg.sender] = initialSupply;
+  }
+  
+  // Actions modify state and create successor coins
+  @stateful
+  action transfer(address to, uint256 amount) {
+    require(state.balances[msg.sender] >= amount, "Insufficient balance");
+    require(to != address(0), "Invalid recipient");
+    
+    // Update state (in the successor coin)
+    state.balances[msg.sender] -= amount;
+    state.balances[to] += amount;
+    
+    // Emit event as puzzle announcement
+    emit Transfer(msg.sender, to, amount);
+    
+    // The @stateful decorator ensures this coin recreates itself
+    // with the updated state curried into the new puzzle hash
+  }
+  
+  @stateful
+  action approve(address spender, uint256 amount) {
+    require(spender != address(0), "Invalid spender");
+    
+    state.allowances[msg.sender][spender] = amount;
+    emit Approval(msg.sender, spender, amount);
+  }
+  
+  @stateful
+  action transferFrom(address from, address to, uint256 amount) {
+    require(state.allowances[from][msg.sender] >= amount, "Insufficient allowance");
+    require(state.balances[from] >= amount, "Insufficient balance");
+    require(to != address(0), "Invalid recipient");
+    
+    state.balances[from] -= amount;
+    state.balances[to] += amount;
+    state.allowances[from][msg.sender] -= amount;
+    
+    emit Transfer(from, to, amount);
+  }
+  
+  @stateful
+  action mint(address to, uint256 amount) {
+    require(msg.sender == creator, "Only creator can mint");
+    require(to != address(0), "Invalid recipient");
+    
+    state.totalSupply += amount;
+    state.balances[to] += amount;
+    
+    emit Mint(to, amount);
+  }
+  
+  // View functions don't modify state
+  // They would be implemented as separate read-only puzzles
+  function balanceOf(address account) view returns (uint256) {
+    return state.balances[account];
+  }
+  
+  function allowance(address owner, address spender) view returns (uint256) {
+    return state.allowances[owner][spender];
+  }
+  
+  function totalSupply() view returns (uint256) {
+    return state.totalSupply;
+  }
+}
+
+// Usage Example:
+// 1. Deploy creates the eve coin with initial state
+// 2. Each action spend destroys the current coin and creates a successor
+// 3. State is preserved through the coin chain
+// 4. Anyone can verify the current state by following the chain from eve coin
+
+// Key differences from account-based models:
+// - No global state - each coin is independent
+// - State transitions are atomic and irreversible
+// - Parallel execution is natural (different coins can be spent simultaneously)
+// - MEV resistance through coin isolation
+// - Complete audit trail through coin lineage 

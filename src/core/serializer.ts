@@ -64,6 +64,12 @@ export function serialize(node: TreeNode, options: SerializeOptions = {}): strin
       // Check if this numeric value should be replaced based on included libraries
       const numValue = Number(value);
       
+      // If condition_codes.clib is included, check if this is a condition code
+      if (includedLibraries.some(lib => lib.includes('condition_codes'))) {
+        const conditionName = getConditionCodeName(numValue);
+        if (conditionName) return conditionName;
+      }
+      
       // If opcodes.clib is included, use keyword forms (q, a, i, etc.)
       if (includedLibraries.some(lib => lib.includes('opcodes.clib'))) {
         const keyword = getKeyword(numValue);
@@ -80,6 +86,14 @@ export function serialize(node: TreeNode, options: SerializeOptions = {}): strin
 
     // String (symbol)
     if (typeof value === 'string') {
+      // Special handling for string literals that are already quoted
+      // If the value starts and ends with quotes, it's a string literal
+      if (value.startsWith('"') && value.endsWith('"') && value.length > 1) {
+        // Extract the content and re-quote it properly
+        const content = value.slice(1, -1);
+        return `"${escapeString(content)}"`;
+      }
+      
       // Check if this symbol should be replaced based on included libraries
       // BUT: if opcodes.clib is included, prefer keeping opcode constants as-is
       const isOpcodesIncluded = includedLibraries.some(lib => lib.includes('opcodes.clib'));
@@ -403,7 +417,32 @@ function getKeyword(value: number): string | null {
   return keywords[value] || null;
 }
 
-
+/**
+ * Get condition code name for numeric values
+ */
+function getConditionCodeName(value: number): string | null {
+  const conditionCodes: Record<number, string> = {
+    1: 'REMARK',
+    49: 'AGG_SIG_UNSAFE',
+    50: 'AGG_SIG_ME',
+    51: 'CREATE_COIN',
+    52: 'RESERVE_FEE',
+    60: 'CREATE_COIN_ANNOUNCEMENT',
+    61: 'ASSERT_COIN_ANNOUNCEMENT',
+    62: 'CREATE_PUZZLE_ANNOUNCEMENT',
+    63: 'ASSERT_PUZZLE_ANNOUNCEMENT',
+    70: 'ASSERT_MY_COIN_ID',
+    71: 'ASSERT_MY_PARENT_ID',
+    72: 'ASSERT_MY_PUZZLEHASH',
+    73: 'ASSERT_MY_AMOUNT',
+    80: 'ASSERT_SECONDS_RELATIVE',
+    81: 'ASSERT_SECONDS_ABSOLUTE',
+    82: 'ASSERT_HEIGHT_RELATIVE',
+    83: 'ASSERT_HEIGHT_ABSOLUTE'
+  };
+  
+  return conditionCodes[value] || null;
+}
 
 /**
  * Get symbol replacement based on included libraries
@@ -465,25 +504,8 @@ function getSymbolReplacement(symbol: string, includedLibraries: string[]): stri
       'INCLUDE': 'include',
       'LIST': 'list'
     },
-    'condition_codes.clib': {
-      'CREATE_COIN': '51',
-      'AGG_SIG_ME': '50',
-      'AGG_SIG_UNSAFE': '49',
-      'RESERVE_FEE': '52',
-      'CREATE_COIN_ANNOUNCEMENT': '60',
-      'ASSERT_COIN_ANNOUNCEMENT': '61',
-      'CREATE_PUZZLE_ANNOUNCEMENT': '62',
-      'ASSERT_PUZZLE_ANNOUNCEMENT': '63',
-      'ASSERT_MY_COIN_ID': '70',
-      'ASSERT_MY_PARENT_ID': '71',
-      'ASSERT_MY_PUZZLEHASH': '72',
-      'ASSERT_MY_AMOUNT': '73',
-      'ASSERT_SECONDS_RELATIVE': '80',
-      'ASSERT_SECONDS_ABSOLUTE': '81',
-      'ASSERT_HEIGHT_RELATIVE': '82',
-      'ASSERT_HEIGHT_ABSOLUTE': '83',
-      'REMARK': '1'
-    },
+    // Note: condition_codes.clib defines constants that we want to KEEP as symbolic names
+    // so we don't include it here for replacements
     'utility_macros.clib': {
       'ASSERT': 'assert'
     }

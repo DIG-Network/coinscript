@@ -1,34 +1,52 @@
 /**
- * Global CSS for customizing the purple theme based on a darker purple from the logo.
- * Infima default variables are overridden here for both light and dark modes.
+ * CSS for CoinScript documentation theme
  */
 
-/* Override the default Infima variables with darker purple shades */
+/* Light mode colors */
 :root {
-  --ifm-color-primary: #652edc; /* Darker purple from the logo */
-  --ifm-color-primary-dark: #5521c6; /* Slightly darker purple */
-  --ifm-color-primary-darker: #4a1ea9; /* Even darker purple */
-  --ifm-color-primary-darkest: #3f1b8c; /* Deep purple */
-  --ifm-color-primary-light: #7640e2; /* Lighter shade of the dark purple */
-  --ifm-color-primary-lighter: #8856e7; /* Soft lighter purple */
-  --ifm-color-primary-lightest: #996cee; /* Very light purple */
+  --ifm-color-primary: #2b7ce9;
+  --ifm-color-primary-dark: #1a6dd8;
+  --ifm-color-primary-darker: #1762cb;
+  --ifm-color-primary-darkest: #1351a8;
+  --ifm-color-primary-light: #4b8cf0;
+  --ifm-color-primary-lighter: #5e97f2;
+  --ifm-color-primary-lightest: #91b7f7;
   --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(101, 46, 220, 0.1); /* Light purple for highlighted code lines */
+  --docusaurus-highlighted-code-line-bg: rgba(43, 124, 233, 0.1);
 }
 
-/* Dark mode color palette with darker purples */
+/* Dark mode colors */
 [data-theme='dark'] {
-  --ifm-color-primary-dark: #371785; /* A shade darker */
-  --ifm-color-primary-darker: #30137b;
-  --ifm-color-primary-darkest: #2a1071; /* Deepest dark purple */
-  --ifm-color-primary-light: #48219b; /* Slightly lighter purple for contrast */
-  --ifm-color-primary-lighter: #5734b3;
-  --ifm-color-primary-lightest: #674dcc;
-  --ifm-color-primary: #A288FF;
-  --docusaurus-highlighted-code-line-bg: rgba(63, 27, 140, 0.3); /* Dark purple highlight in dark mode */
+  --ifm-color-primary: #5e97f2;
+  --ifm-color-primary-dark: #3a7aee;
+  --ifm-color-primary-darker: #2a6fec;
+  --ifm-color-primary-darkest: #1756d1;
+  --ifm-color-primary-light: #82aef6;
+  --ifm-color-primary-lighter: #92b9f7;
+  --ifm-color-primary-lightest: #c6dbfc;
+  --ifm-background-color: #1a1a1a;
+  --docusaurus-highlighted-code-line-bg: rgba(94, 151, 242, 0.15);
 }
 
+/* Code syntax highlighting */
+pre code {
+  background-color: transparent;
+}
 
+/* Custom styles for CoinScript code blocks */
+.language-coinscript {
+  color: #d4d4d4;
+}
+
+/* Navbar styling */
+.navbar__title {
+  font-weight: 700;
+}
+
+/* Homepage hero gradient */
+.hero--primary {
+  --ifm-hero-background-color: linear-gradient(135deg, #2b7ce9 0%, #1a6dd8 100%);
+}
 
 @tailwind components;
 @tailwind utilities;

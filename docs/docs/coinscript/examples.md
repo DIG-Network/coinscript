@@ -447,7 +447,7 @@ Now that you've seen these examples:
 
 1. Try modifying them to add new features
 2. Experiment with different patterns
-3. Learn about the [PuzzleBuilder and SolutionBuilder](./puzzle-solution-builder.md)
-4. Dive into the [comprehensive CoinScript reference](./reference.md)
+3. Learn about the [PuzzleBuilder and SolutionBuilder](./puzzle-solution-builder)
+4. Dive into the [comprehensive CoinScript reference](./reference)
 
 Remember: CoinScript compiles to ChiaLisp, so you always have the option to optimize critical sections by hand!

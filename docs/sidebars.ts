@@ -11,28 +11,47 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
  Create as many sidebars as you want.
  */
 const sidebars: SidebarsConfig = {
-  // Main sidebar
+  // Main documentation sidebar with logical flow
   tutorialSidebar: [
-    'intro',
-  ],
-
-  implementationSidebar: [
-    'intro',
-  ],
-
-  // CoinScript documentation sidebar
-  coinscriptSidebar: [
+    {
+      type: 'category',
+      label: 'Introduction',
+      collapsed: false,
+      items: [
+        'intro',
+        'getting-started',
+        'quick-start',
+        'basic-examples',
+        'chialisp-overview',
+      ],
+    },
     {
       type: 'category',
       label: 'CoinScript',
+      collapsed: false,
       items: [
+        'coinscript/introduction',
         'coinscript/why-coinscript',
         'coinscript/quick-start',
         'coinscript/examples',
-        'coinscript/puzzle-solution-builder',
-        'coinscript/ast-engine',
         'coinscript/reference',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'PuzzleBuilder',
+      collapsed: false,
+      items: [
+        'coinscript/puzzle-solution-builder',
         'coinscript/builder-patterns',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'AST Engine',
+      collapsed: false,
+      items: [
+        'coinscript/ast-engine',
       ],
     },
   ],

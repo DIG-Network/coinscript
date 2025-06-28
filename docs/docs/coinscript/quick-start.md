@@ -211,9 +211,9 @@ async function testContract() {
 
 Now that you've created your first CoinScript contract:
 
-1. **Explore More Examples** - Check out our [CoinScript Examples](./examples.md) for more complex patterns
-2. **Learn the Language** - Dive deep into [CoinScript Reference](./reference.md)
-3. **Understand the Framework** - Learn about [PuzzleBuilder and SolutionBuilder](./puzzle-solution-builder.md)
+1. **Explore More Examples** - Check out our [CoinScript Examples](./examples) for more complex patterns
+2. **Learn the Language** - Dive deep into [CoinScript Reference](./reference)
+3. **Understand the Framework** - Learn about [PuzzleBuilder and SolutionBuilder](./puzzle-solution-builder)
 
 ## Summary
 

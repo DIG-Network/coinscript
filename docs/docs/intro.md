@@ -1,40 +1,47 @@
 ---
 sidebar_position: 1
-title: Welcome to Chia Puzzle Framework
+title: Introduction to CoinScript
 ---
 
-# Welcome to Chia Puzzle Framework Documentation
+# Introduction to CoinScript
 
-Welcome to the comprehensive documentation for the Chia Puzzle Framework, including **CoinScript** - a high-level language for Chia smart coin development.
+Welcome to CoinScript, a high-level language that compiles to ChiaLisp, making Chia blockchain development accessible and productive.
 
-## What You'll Find Here
+## What is CoinScript?
 
-### 🪙 CoinScript Documentation
+CoinScript is a **high-level transcompiler** that transforms modern, familiar syntax into ChiaLisp code. It's designed to bridge the gap between conventional blockchain development and the unique Lisp-based smart contract system of the Chia blockchain.
 
-CoinScript is a Solidity-like language that compiles to ChiaLisp, making Chia development accessible to developers from other blockchain ecosystems.
+### Key Features
 
-**[Get Started with CoinScript →](./coinscript/why-coinscript.md)**
+- **📝 Familiar Syntax** - Write smart contracts using Solidity-like syntax
+- **🔒 Type Safety** - Catch errors at compile time with a robust type system
+- **🚀 High Performance** - Compiles to optimized ChiaLisp and CLVM bytecode
+- **🛠️ Rich Tooling** - Integrated with PuzzleBuilder and the AST engine
+- **📚 Comprehensive** - Full support for Chia's unique features
 
-- [Why CoinScript?](./coinscript/why-coinscript.md) - Understand the motivation and benefits
-- [Quick Start Guide](./coinscript/quick-start.md) - Create your first smart coin in minutes
-- [Examples](./coinscript/examples.md) - Learn through practical examples
-- [Language Reference](./coinscript/reference.md) - Complete language documentation
+## Why CoinScript?
 
-### 🔧 Framework Tools
+### The Challenge with ChiaLisp
 
-Learn about the powerful tools that make up the Chia Puzzle Framework:
+ChiaLisp is powerful but presents challenges:
 
-- [PuzzleBuilder & SolutionBuilder](./coinscript/puzzle-solution-builder.md) - JavaScript APIs for puzzle creation
-- [AST Engine](./coinscript/ast-engine.md) - The technology powering the framework
-- [Builder Patterns](./coinscript/builder-patterns.md) - Advanced patterns and techniques
+```clsp
+(mod (recipient amount)
+  (list
+    (list AGG_SIG_ME 0x123... (sha256 recipient amount))
+    (list CREATE_COIN recipient amount)
+  )
+)
+```
 
-## Quick Example
+### The CoinScript Solution
 
-Here's a taste of what you can build with CoinScript:
+The same logic in CoinScript:
 
 ```coinscript
 coin SimplePayment {
-  storage address owner = 0x1234...;
+  // Storage is immutable - part of the puzzle hash
+  storage address owner = 0x123...;
   
   action transfer(address recipient, uint256 amount) {
     requireSignature(owner);
@@ -43,7 +50,103 @@ coin SimplePayment {
 }
 ```
 
-This compiles to optimized ChiaLisp that runs on the Chia blockchain!
+For mutable state, CoinScript uses the slot-machine pattern:
+
+```coinscript
+coin StatefulToken {
+  // Immutable configuration
+  storage address admin = 0x123...;
+  storage uint256 maxSupply = 1000000;
+  
+  // Mutable state (passed in solution)
+  state {
+    uint256 totalSupply;
+    mapping(address => uint256) balances;
+  }
+  
+  @stateful
+  action mint(address to, uint256 amount) {
+    require(msg.sender == admin, "Not admin");
+    require(state.totalSupply + amount <= maxSupply, "Exceeds max");
+    
+    state.totalSupply += amount;
+    state.balances[to] += amount;
+  }
+}
+```
+
+## Framework Components
+
+The Chia Puzzle Framework consists of three main components:
+
+### 1. CoinScript Language
+A high-level language with modern syntax for writing smart contracts.
+
+### 2. PuzzleBuilder
+A JavaScript/TypeScript API for programmatically building Chia puzzles.
+
+### 3. AST Engine
+The underlying engine that powers both CoinScript and PuzzleBuilder through abstract syntax tree manipulation.
+
+## Quick Example
+
+Here's a complete example showing all three components working together:
+
+### CoinScript Contract
+
+```coinscript
+// token.coins
+coin SimpleToken {
+  // Storage is immutable and curried into the puzzle
+  storage address owner = 0x...;
+  storage uint256 maxMintAmount = 10000;
+  
+  action mint(address to, uint256 amount) {
+    requireSignature(owner);
+    require(amount > 0, "Amount must be positive");
+    require(amount <= maxMintAmount, "Exceeds max mint");
+    sendCoins(to, amount);
+  }
+}
+```
+
+### Using PuzzleBuilder
+
+```javascript
+import { PuzzleBuilder, SolutionBuilder } from 'chia-puzzle-framework';
+
+// Load and compile CoinScript
+const puzzle = new PuzzleBuilder();
+await puzzle.loadCoinScript('./token.coins');
+
+// Or build programmatically
+const customPuzzle = new PuzzleBuilder()
+  .constant('OWNER', ownerAddress)
+  .parameter('action')
+  .parameter('amount')
+  .if(
+    b => b.equals('action', '"mint"'),
+    b => b.requireSignature('OWNER')
+         .require(b => b.greaterThan('amount', 0))
+         .createCoin('recipient', 'amount')
+  );
+```
+
+### Creating Solutions
+
+```javascript
+// Create a solution to spend the coin
+const solution = new SolutionBuilder()
+  .addParam('action', 'mint')
+  .addParam('to', recipientAddress)
+  .addParam('amount', 1000)
+  .build();
+
+// Get the compiled output
+const chialisp = puzzle.toChiaLisp();
+const clvm = puzzle.toCLVM(); // Hex bytecode
+const puzzleHash = puzzle.hash();
+```
 
 ## Getting Started
 
@@ -53,28 +156,33 @@ This compiles to optimized ChiaLisp that runs on the Chia blockchain!
    ```
 
 2. **Choose Your Path**
-   - **New to Chia?** Start with [Why CoinScript?](./coinscript/why-coinscript.md)
-   - **Ready to code?** Jump to the [Quick Start Guide](./coinscript/quick-start.md)
-   - **Want to see examples?** Check out [CoinScript Examples](./coinscript/examples.md)
+   - **New to Chia?** Start with our [Getting Started Guide](./getting-started)
+   - **Know ChiaLisp?** Jump to [Quick Start](./quick-start)
+   - **Want Examples?** Check out [Basic Examples](./basic-examples)
 
-## Why Use This Framework?
+## What You'll Learn
 
-- **🚀 Lower Barrier to Entry** - Write smart coins without learning Lisp
-- **🛡️ Type Safety** - Catch errors at compile time
-- **🔄 Seamless Integration** - Works with existing Chia tools
-- **📚 Comprehensive Documentation** - Everything you need in one place
-- **🎯 Production Ready** - Used in real Chia applications
+This documentation will teach you:
 
-## Community & Support
+- ✅ How to write smart contracts in CoinScript
+- ✅ Building puzzles programmatically with PuzzleBuilder
+- ✅ Understanding the AST engine and ChiaLisp representation
+- ✅ Best practices for Chia development
+- ✅ Advanced patterns and optimizations
 
-- **GitHub**: [Chia Puzzle Framework](https://github.com/DIG-Network)
-- **Discord**: Join the Chia developer community
-- **Forum**: Discuss and get help
+## Prerequisites
 
-## Contributing
+- Basic understanding of blockchain concepts
+- Familiarity with JavaScript/TypeScript
+- No ChiaLisp knowledge required!
 
-We welcome contributions! Whether it's improving documentation, adding examples, or enhancing the framework itself.
+## Next Steps
 
----
+Ready to dive in? Here's your learning path:
 
-Ready to start building? Head to the [CoinScript documentation](./coinscript/why-coinscript.md) and begin your journey into Chia smart coin development!
+1. **[Getting Started](./getting-started)** - Set up your development environment
+2. **[Quick Start](./quick-start)** - Build your first CoinScript contract
+3. **[Basic Examples](./basic-examples)** - Learn through practical examples
+4. **[ChiaLisp Overview](./chialisp-overview)** - Understand the compilation target
+
+Welcome to the future of Chia development! 🌱
