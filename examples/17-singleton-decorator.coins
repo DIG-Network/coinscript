@@ -9,7 +9,7 @@ coin SingletonToken {
     }
     
     state {
-        uint256 currentSupply = 0;
+        uint256 currentSupply;
         mapping(address => uint256) balances;
     }
     
@@ -44,7 +44,9 @@ coin SingletonToken {
 // You can also provide a specific launcher ID
 @singleton(0x1234567890123456789012345678901234567890123456789012345678901234)
 coin NamedSingleton {
-    storage address owner = "xch1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqm6ks6e8mvy";
+    storage {
+        address owner = "xch1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqm6ks6e8mvy";
+    }
     
     action spend() {
         require(msg.sender == owner, "Not owner");

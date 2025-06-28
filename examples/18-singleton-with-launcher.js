@@ -27,7 +27,7 @@ console.log(result.mainPuzzle.serialize({ indent: true }));
 if (result.launcherPuzzle) {
     console.log('\nLauncher Puzzle:');
     console.log('─'.repeat(50));
-    console.log(result.launcherPuzzle.serialize({ indent: true }));
+    console.log(result.launcherPuzzle.serialize({ indent: false }));
     
     console.log('\nLauncher Usage:');
     console.log('─'.repeat(50));

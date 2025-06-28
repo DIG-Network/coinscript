@@ -6,6 +6,7 @@
 
 import { 
   TreeNode, 
+  Atom,
   list, 
   sym, 
   int, 
@@ -21,6 +22,8 @@ import {
   ALL, ANY, NIL, MOD, RAISE
 } from '../core/opcodes';
 import { Program } from 'clvm-lib';
+import { readFileSync } from 'fs';
+import { parseChialisp } from '../chialisp/parser';
 
 // Type-safe condition builders
 export interface ConditionBuilder {
@@ -811,6 +814,91 @@ export class PuzzleBuilder implements ConditionBuilder {
     );
   }
 
+  /**
+   * Load a ChiaLisp (.clsp) file and create a PuzzleBuilder from it
+   * @param filePath Path to the .clsp file
+   * @returns PuzzleBuilder instance with the loaded puzzle
+   */
+  static fromClsp(filePath: string): PuzzleBuilder {
+    try {
+      // Read the file
+      const source = readFileSync(filePath, 'utf-8');
+      
+      // Parse the ChiaLisp code
+      const ast = parseChialisp(source);
+      
+      // Create a new PuzzleBuilder with the parsed AST
+      const builder = new PuzzleBuilder();
+      builder.withMod(ast);
+      
+      // Extract parameters from the mod if present
+      if (ast.type === 'list' && ast.items.length >= 2) {
+        const firstItem = ast.items[0];
+        if (firstItem.type === 'atom' && firstItem.value === 'mod') {
+          const paramList = ast.items[1];
+          if (paramList.type === 'list') {
+            const params = paramList.items
+              .filter((item): item is Atom => item.type === 'atom' && typeof item.value === 'string')
+              .map(item => item.value as string);
+            
+            // Separate curried vs solution parameters by convention
+            // (uppercase = curried, lowercase = solution)
+            const curriedParams: string[] = [];
+            const solutionParams: string[] = [];
+            
+            for (const param of params) {
+              if (param === param.toUpperCase() && param !== '@') {
+                curriedParams.push(param);
+              } else if (param !== '@') {
+                solutionParams.push(param);
+              }
+            }
+            
+            // Apply parameters to the builder
+            if (curriedParams.length > 0) {
+              const paramObj: Record<string, string> = {};
+              curriedParams.forEach(p => paramObj[p] = p);
+              builder.withCurriedParams(paramObj);
+            }
+            
+            if (solutionParams.length > 0) {
+              builder.withSolutionParams(...solutionParams);
+            }
+          }
+        }
+      }
+      
+      return builder;
+    } catch (error) {
+      throw new Error(`Failed to load ChiaLisp file ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Load a CoinScript (.coins) file and create a PuzzleBuilder from it
+   * @param filePath Path to the .coins file
+   * @returns PuzzleBuilder instance with the compiled puzzle
+   */
+  static fromCoinScript(filePath: string): PuzzleBuilder {
+    try {
+      // Import is deferred to avoid circular dependency
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { compileCoinScript } = require('../coinscript/parser') as {
+        compileCoinScript: (source: string) => { mainPuzzle: PuzzleBuilder };
+      };
+      
+      // Read the file
+      const source = readFileSync(filePath, 'utf-8');
+      
+      // Compile the CoinScript
+      const result = compileCoinScript(source);
+      
+      // Return the main puzzle
+      return result.mainPuzzle;
+    } catch (error) {
+      throw new Error(`Failed to load CoinScript file ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 }
 
 // === FACTORY FUNCTIONS ===
