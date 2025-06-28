@@ -11,90 +11,30 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
  Create as many sidebars as you want.
  */
 const sidebars: SidebarsConfig = {
-  // Custom sidebar for DIG Network documentation
+  // Main sidebar
   tutorialSidebar: [
     'intro',
-    'support',
-    {
-      type: 'category',
-      label: 'System Overview',
-      items: [
-        'overview/architecture',
-        'overview/network-lifecycle',
-        'overview/system-components',
-        'overview/network-participants',
-        'overview/content-propagation',
-        'overview/incentive-model',
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Off-Chain Primitives',
-      items: [
-        'primitives/off-chain/capsule',
-        'primitives/off-chain/plots',
-        'primitives/off-chain/cart',
-      ],
-    },
-    {
-      type: 'category',
-      label: 'On-Chain Primitives',
-      items: [
-        'primitives/on-chain/plotcoin',
-        'primitives/on-chain/witnesscoin',
-        'primitives/on-chain/datastore',
-        'primitives/on-chain/capsulestakecoin',
-        'primitives/on-chain/dig-handles',
-        'primitives/on-chain/rewards-distributor',
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Cryptographic Proofs',
-      items: [
-        'proofs/overview',
-        'proofs/plot-ownership',
-        'proofs/data-inclusion',
-        'proofs/computational-work',
-        'proofs/physical-access',
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Economics',
-      items: [
-        'economics/token-model',
-        'economics/investor-strategy',
-        'economics/airdrop',
-        'economics/network-model',
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Network Operations',
-      items: [
-        'network/bribes',
-        'network/urn-resolution',
-        'network/dao-governance',
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Software Specifications',
-      items: [
-        'technical/dig-node',
-        'technical/witness-miner',
-        'technical/validator-node',
-        'technical/dig-browser',
-      ],
-    },
   ],
 
   implementationSidebar: [
-    'technical/dig-node',
-    'technical/witness-miner',
-    'technical/validator-node',
-    'technical/dig-browser',
+    'intro',
+  ],
+
+  // CoinScript documentation sidebar
+  coinscriptSidebar: [
+    {
+      type: 'category',
+      label: 'CoinScript',
+      items: [
+        'coinscript/why-coinscript',
+        'coinscript/quick-start',
+        'coinscript/examples',
+        'coinscript/puzzle-solution-builder',
+        'coinscript/ast-engine',
+        'coinscript/reference',
+        'coinscript/builder-patterns',
+      ],
+    },
   ],
 };
 
