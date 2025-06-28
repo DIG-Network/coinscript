@@ -1,0 +1,218 @@
+coin NFTOwnershipLayer {
+    // Constants
+    const NEW_OWNER_CONDITION = -10;
+    const ANNOUNCEMENT_PREFIX = 0xad4c;  // first 2 bytes of (sha256 "Ownership Layer")
+    
+    // Constructor parameters (mod parameters)
+    constructor(
+        bytes32 NFT_OWNERSHIP_LAYER_MOD_HASH,
+        address CURRENT_OWNER,
+        bytes32 TRANSFER_PROGRAM,
+        bytes32 INNER_PUZZLE,
+        bytes inner_solution
+    ) {}
+    
+    // Inline function to calculate NFT ownership layer puzzle hash
+    inline function nft_ownership_layer_puzzle_hash(
+        bytes32 NFT_OWNERSHIP_LAYER_MOD_HASH,
+        address new_owner,
+        bytes32 TRANSFER_PROGRAM,
+        bytes32 inner_puzzle_hash
+    ) => bytes32 {
+        // puzzle-hash-of-curried-function implementation
+        // In CoinScript, we'd need to implement the curry logic
+        // For now, this is a placeholder showing the structure
+        return sha256tree(
+            curry(
+                NFT_OWNERSHIP_LAYER_MOD_HASH,
+                inner_puzzle_hash,
+                sha256tree(TRANSFER_PROGRAM),
+                sha256(1, new_owner),
+                sha256(1, NFT_OWNERSHIP_LAYER_MOD_HASH)
+            )
+        );
+    }
+    
+    // Function to construct end conditions
+    function construct_end_conditions(
+        bytes32 NFT_OWNERSHIP_LAYER_MOD_HASH,
+        bytes32 TRANSFER_PROGRAM,
+        list odd_args,
+        address new_owner,
+        bytes32 new_tp,
+        list conditions
+    ) => list {
+        // Create the new coin with updated ownership
+        bytes32 new_puzzle_hash = nft_ownership_layer_puzzle_hash(
+            NFT_OWNERSHIP_LAYER_MOD_HASH,
+            new_owner,
+            new_tp ? new_tp : TRANSFER_PROGRAM,
+            first(odd_args)
+        );
+        
+        // Return CREATE_COIN condition plus other conditions
+        return cons(
+            list(CREATE_COIN, new_puzzle_hash, rest(odd_args)),
+            conditions
+        );
+    }
+    
+    // Main recursive function to process conditions
+    function wrap_odd_create_coins(
+        bytes32 NFT_OWNERSHIP_LAYER_MOD_HASH,
+        bytes32 TRANSFER_PROGRAM,
+        address CURRENT_OWNER,
+        list all_conditions,
+        list conditions,
+        list odd_args,
+        list tp_output
+    ) => list {
+        if (!conditions) {
+            // Base case: no more conditions to process
+            // odd_args is guaranteed to not be nil
+            if (tp_output) {
+                return construct_end_conditions(
+                    NFT_OWNERSHIP_LAYER_MOD_HASH,
+                    TRANSFER_PROGRAM,
+                    odd_args,
+                    tp_output
+                );
+            } else {
+                // Run transfer program to get output
+                list transfer_result = apply(TRANSFER_PROGRAM, list(CURRENT_OWNER, all_conditions, nil));
+                return construct_end_conditions(
+                    NFT_OWNERSHIP_LAYER_MOD_HASH,
+                    TRANSFER_PROGRAM,
+                    odd_args,
+                    transfer_result
+                );
+            }
+        }
+        
+        // Get the first condition
+        list current_condition = first(conditions);
+        uint256 opcode = first(current_condition);
+        
+        // Check for CREATE_COIN condition
+        if (opcode == CREATE_COIN) {
+            // Check if amount is odd (NFT marker)
+            uint256 amount = first(rest(rest(current_condition)));
+            if ((amount & 1) == 1) {
+                // This is an odd coin (NFT)
+                require(!odd_args, "Multiple odd coins not allowed");
+                
+                // Recurse with this as the odd_args
+                return wrap_odd_create_coins(
+                    NFT_OWNERSHIP_LAYER_MOD_HASH,
+                    TRANSFER_PROGRAM,
+                    CURRENT_OWNER,
+                    all_conditions,
+                    rest(conditions),
+                    rest(current_condition),  // puzzle_hash and amount
+                    tp_output
+                );
+            } else {
+                // Regular coin, pass through
+                return cons(
+                    current_condition,
+                    wrap_odd_create_coins(
+                        NFT_OWNERSHIP_LAYER_MOD_HASH,
+                        TRANSFER_PROGRAM,
+                        CURRENT_OWNER,
+                        all_conditions,
+                        rest(conditions),
+                        odd_args,
+                        tp_output
+                    )
+                );
+            }
+        }
+        
+        // Check for NEW_OWNER_CONDITION
+        if (opcode == NEW_OWNER_CONDITION) {
+            require(!tp_output, "Transfer program already set");
+            
+            // Create announcement and run transfer program
+            bytes32 announcement_msg = concat(ANNOUNCEMENT_PREFIX, sha256tree(rest(current_condition)));
+            list announcement = list(CREATE_PUZZLE_ANNOUNCEMENT, announcement_msg);
+            
+            // Run transfer program with new owner
+            list transfer_result = apply(
+                TRANSFER_PROGRAM, 
+                list(CURRENT_OWNER, all_conditions, rest(current_condition))
+            );
+            
+            return cons(
+                announcement,
+                wrap_odd_create_coins(
+                    NFT_OWNERSHIP_LAYER_MOD_HASH,
+                    TRANSFER_PROGRAM,
+                    CURRENT_OWNER,
+                    all_conditions,
+                    rest(conditions),
+                    odd_args,
+                    transfer_result
+                )
+            );
+        }
+        
+        // Check for CREATE_PUZZLE_ANNOUNCEMENT
+        if (opcode == CREATE_PUZZLE_ANNOUNCEMENT) {
+            bytes message = first(rest(current_condition));
+            
+            // Ensure it's not using our reserved prefix
+            require(
+                !(strlen(message) == 34 && substr(message, 0, 2) == ANNOUNCEMENT_PREFIX),
+                "Reserved announcement prefix"
+            );
+            
+            // Pass through the announcement
+            return cons(
+                current_condition,
+                wrap_odd_create_coins(
+                    NFT_OWNERSHIP_LAYER_MOD_HASH,
+                    TRANSFER_PROGRAM,
+                    CURRENT_OWNER,
+                    all_conditions,
+                    rest(conditions),
+                    odd_args,
+                    tp_output
+                )
+            );
+        }
+        
+        // Default: pass through any other condition
+        return cons(
+            current_condition,
+            wrap_odd_create_coins(
+                NFT_OWNERSHIP_LAYER_MOD_HASH,
+                TRANSFER_PROGRAM,
+                CURRENT_OWNER,
+                all_conditions,
+                rest(conditions),
+                odd_args,
+                tp_output
+            )
+        );
+    }
+    
+    // Default action that runs when the coin is spent
+    action default() {
+        // Run the inner puzzle with inner solution
+        list inner_conditions = apply(INNER_PUZZLE, inner_solution);
+        
+        // Process the conditions through our ownership logic
+        list final_conditions = wrap_odd_create_coins(
+            NFT_OWNERSHIP_LAYER_MOD_HASH,
+            TRANSFER_PROGRAM,
+            CURRENT_OWNER,
+            inner_conditions,
+            inner_conditions,
+            nil,
+            nil
+        );
+        
+        // Return the processed conditions
+        return final_conditions;
+    }
+} 

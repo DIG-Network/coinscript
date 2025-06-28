@@ -52,6 +52,7 @@ enum TokenType {
   FUNCTION = 'FUNCTION',
   INLINE = 'INLINE',
   RETURN = 'RETURN',
+  INCLUDE = 'INCLUDE',
   
   // Types
   UINT256 = 'UINT256',
@@ -381,6 +382,7 @@ class Tokenizer {
       'function': TokenType.FUNCTION,
       'inline': TokenType.INLINE,
       'return': TokenType.RETURN,
+      'include': TokenType.INCLUDE,
       'uint256': TokenType.UINT256,
       'address': TokenType.ADDRESS,
       'bool': TokenType.BOOL,
@@ -444,6 +446,7 @@ interface ASTNode {
 interface CoinDeclaration extends ASTNode {
   type: 'CoinDeclaration';
   name: string;
+  includes?: IncludeStatement[];
   layers: LayerDeclaration[];
   storage?: StorageVariable[];
   state?: StateVariable[];
@@ -628,6 +631,11 @@ interface StateField extends ASTNode {
   isMapping?: boolean;
 }
 
+interface IncludeStatement extends ASTNode {
+  type: 'IncludeStatement';
+  path: string;
+}
+
 /**
  * Result of compiling CoinScript that may contain multiple puzzles
  */
@@ -669,6 +677,12 @@ class Parser {
   }
   
   parse(): CoinDeclaration {
+    // Parse includes at the top level
+    const includes: IncludeStatement[] = [];
+    while (this.check(TokenType.INCLUDE)) {
+      includes.push(this.parseIncludeStatement());
+    }
+    
     // Check for decorators before coin declaration
     let decorators: Decorator[] | undefined;
     if (this.check(TokenType.AT)) {
@@ -680,7 +694,60 @@ class Parser {
       coin.decorators = decorators;
     }
     
+    // Add includes to the coin declaration
+    if (includes.length > 0) {
+      coin.includes = includes;
+    }
+    
     return coin;
+  }
+  
+  private parseIncludeStatement(): IncludeStatement {
+    this.expect(TokenType.INCLUDE);
+    const startToken = this.current();
+    
+    let pathValue = '';
+    
+    // If it's a string literal, just use that
+    if (this.check(TokenType.STRING)) {
+      const stringToken = this.advance();
+      pathValue = stringToken.value;
+    } else {
+      // Otherwise, consume tokens until we hit a newline, semicolon, or EOF
+      // This allows paths with hyphens, dots, slashes, etc.
+      while (!this.isAtEnd() && 
+             !this.check(TokenType.SEMICOLON) && 
+             !this.check(TokenType.COIN) &&
+             !this.check(TokenType.AT) &&
+             !this.check(TokenType.INCLUDE)) {
+        
+        const token = this.current();
+        
+        // Skip newlines but break on them
+        if (token.type === TokenType.NEWLINE) {
+          break;
+        }
+        
+        // Add the token value to the path
+        pathValue += token.value;
+        this.advance();
+      }
+      
+      // Trim any trailing whitespace
+      pathValue = pathValue.trim();
+    }
+    
+    // Optional semicolon
+    if (this.check(TokenType.SEMICOLON)) {
+      this.advance();
+    }
+    
+    return {
+      type: 'IncludeStatement',
+      path: pathValue,
+      line: startToken.line,
+      column: startToken.column
+    };
   }
   
   private parseCoinDeclaration(): CoinDeclaration {
@@ -690,6 +757,7 @@ class Parser {
     const coin: CoinDeclaration = {
       type: 'CoinDeclaration',
       name: name.value,
+      includes: undefined,
       layers: [],
       storage: undefined,
       state: undefined,
@@ -1709,9 +1777,18 @@ class CodeGenerator {
   private functionDefinitions: Map<string, FunctionDeclaration> = new Map(); // Track function definitions
   private _functionNodes: TreeNode[] = []; // Store compiled function nodes
   private _constantNodes: TreeNode[] = []; // Store compiled constant nodes
+  private _manualIncludes: Set<string> = new Set(); // Track manual includes
+  private _autoIncludes: Set<string> = new Set(); // Track auto includes
   
   constructor(coin: CoinDeclaration) {
     this.coin = coin;
+    
+    // Process manual includes from the coin declaration
+    if (coin.includes) {
+      for (const include of coin.includes) {
+        this._manualIncludes.add(include.path);
+      }
+    }
   }
   
   generate(): CoinScriptCompilationResult {
@@ -1939,6 +2016,7 @@ class CodeGenerator {
           
           if (needsConditionCodes) {
             innerPuzzle.includeConditionCodes();
+            this._autoIncludes.add('condition_codes.clib');
           }
           
           const buildActionChain = (actions: ActionDeclaration[], index: number, builder: PuzzleBuilder): void => {
@@ -3002,6 +3080,7 @@ class CodeGenerator {
       
       if (needsConditionCodes) {
         actionPuzzle.includeConditionCodes();
+        this._autoIncludes.add('condition_codes.clib');
       }
       
       // Use parameter names for the mod definition
@@ -3087,8 +3166,21 @@ class CodeGenerator {
     // Get the base puzzle tree
     const basePuzzle = builder.build();
     
-    // If no functions or constants, return the base puzzle
-    if (this._functionNodes.length === 0 && this._constantNodes.length === 0) {
+    // Combine manual and auto includes, avoiding duplicates
+    const allIncludes = new Set<string>();
+    
+    // Add manual includes first
+    for (const path of this._manualIncludes) {
+      allIncludes.add(path);
+    }
+    
+    // Add auto includes only if not already manually included
+    for (const path of this._autoIncludes) {
+      allIncludes.add(path);
+    }
+    
+    // If no functions, constants, or includes, return the base puzzle
+    if (this._functionNodes.length === 0 && this._constantNodes.length === 0 && allIncludes.size === 0) {
       return basePuzzle;
     }
     
@@ -3105,7 +3197,7 @@ class CodeGenerator {
           (listPuzzle.items[0] as Atom).value === 'mod') {
         
         // Find where includes end and body begins
-        let includeEndIndex = 2;
+        let includeEndIndex = 2; // After mod and params
         for (let i = 2; i < listPuzzle.items.length; i++) {
           const item = listPuzzle.items[i];
           if (!(item.type === 'list' && 
@@ -3117,12 +3209,20 @@ class CodeGenerator {
           }
         }
         
-        // Rebuild with constants and functions inserted
+        // Build include nodes from our set
+        const includeNodes: TreeNode[] = [];
+        for (const path of allIncludes) {
+          includeNodes.push(list([sym('include'), sym(path)]));
+        }
+        
+        // Rebuild with includes, constants and functions inserted
         const newItems = [
-          ...listPuzzle.items.slice(0, includeEndIndex), // mod, params, includes
+          listPuzzle.items[0], // mod
+          listPuzzle.items[1], // params
+          ...includeNodes, // all includes (manual + auto)
           ...this._constantNodes, // constant definitions (defconstant)
           ...this._functionNodes, // function definitions (defun/defun-inline)
-          ...listPuzzle.items.slice(includeEndIndex) // body
+          ...listPuzzle.items.slice(includeEndIndex) // body (skip existing includes)
         ];
         
         return list(newItems);

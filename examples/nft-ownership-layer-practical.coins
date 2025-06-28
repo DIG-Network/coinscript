@@ -1,0 +1,119 @@
+// NFT Ownership Layer - Practical CoinScript Implementation
+// This version uses available CoinScript features
+
+coin NFTOwnershipLayer {
+    // Constants matching the original ChiaLisp
+    const NEW_OWNER_CONDITION = -10;
+    const ANNOUNCEMENT_PREFIX = 0xad4c;  // first 2 bytes of (sha256 "Ownership Layer")
+    const ONE = 1;
+    
+    // Storage for immutable parameters
+    storage {
+        bytes32 NFT_OWNERSHIP_LAYER_MOD_HASH;
+        address CURRENT_OWNER;
+        bytes32 TRANSFER_PROGRAM_HASH;
+    }
+    
+    // Constructor to set up the NFT ownership layer
+    constructor(
+        bytes32 modHash,
+        address owner, 
+        bytes32 transferProgram
+    ) {
+        NFT_OWNERSHIP_LAYER_MOD_HASH = modHash;
+        CURRENT_OWNER = owner;
+        TRANSFER_PROGRAM_HASH = transferProgram;
+    }
+    
+    // Helper function to check if a coin amount is odd (NFT marker)
+    inline function isNFTCoin(uint256 amount) => bool {
+        // Check if amount is odd (last bit is 1)
+        // In ChiaLisp this would be (logand amount 1)
+        return (amount % 2) == 1;
+    }
+    
+    // Main action for spending the NFT
+    // In practice, we'd need to handle the inner puzzle execution differently
+    action spend(
+        bytes32 inner_puzzle_hash,
+        bytes inner_solution,
+        address new_owner  // Optional new owner for transfers
+    ) {
+        // Note: In real implementation, we'd need to execute the inner puzzle
+        // For now, we'll show the structure of what would happen
+        
+        if (new_owner != 0x0000000000000000000000000000000000000000000000000000000000000000) {
+            // Transfer case - create announcement
+            emit OwnershipTransfer(CURRENT_OWNER, new_owner);
+            
+            // Create puzzle announcement with our prefix
+            // In real ChiaLisp, this would be CREATE_PUZZLE_ANNOUNCEMENT
+            bytes32 announcement_data = sha256(new_owner);
+            // We'd concatenate ANNOUNCEMENT_PREFIX + announcement_data
+            
+            // Create the new NFT coin with updated ownership
+            // The puzzle hash would be recalculated with new owner
+            send(new_owner, 1);  // NFT always has odd amount
+        } else {
+            // Regular spend - just recreate with same owner
+            send(CURRENT_OWNER, 1);
+        }
+    }
+    
+    // Event for ownership transfers
+    event OwnershipTransfer(address from, address to);
+    
+    // Simplified transfer action
+    @onlyAddress(CURRENT_OWNER)
+    action transfer(address new_owner) {
+        require(new_owner != 0x0000000000000000000000000000000000000000000000000000000000000000);
+        
+        // In the real implementation, this would:
+        // 1. Create a puzzle announcement with ANNOUNCEMENT_PREFIX
+        // 2. Run the transfer program
+        // 3. Create a new coin with updated ownership puzzle
+        
+        emit OwnershipTransfer(CURRENT_OWNER, new_owner);
+        
+        // Create new NFT coin with updated ownership
+        // Note: In real implementation, we'd calculate the new puzzle hash
+        // with the new owner curried in
+        send(new_owner, 1);
+    }
+    
+    // Action to handle CREATE_COIN conditions from inner puzzle
+    action processInnerConditions(
+        bytes32[] puzzle_hashes,
+        uint256[] amounts,
+        bytes[] memos
+    ) {
+        require(puzzle_hashes.length == amounts.length);
+        
+        uint256 odd_coin_count = 0;
+        uint256 odd_coin_index = 0;
+        
+        // Find the odd coin (NFT marker)
+        for (uint256 i = 0; i < amounts.length; i++) {
+            if (isNFTCoin(amounts[i])) {
+                odd_coin_count++;
+                odd_coin_index = i;
+            }
+        }
+        
+        // Ensure exactly one odd coin
+        require(odd_coin_count == 1, "Must have exactly one NFT (odd amount) coin");
+        
+        // Create all the coins
+        for (uint256 i = 0; i < puzzle_hashes.length; i++) {
+            if (i == odd_coin_index) {
+                // This is the NFT - wrap it with ownership layer
+                // In real implementation, we'd recalculate the puzzle hash
+                // with ownership layer wrapping
+                send(CURRENT_OWNER, amounts[i]);
+            } else {
+                // Regular coins pass through unchanged
+                send(puzzle_hashes[i], amounts[i]);
+            }
+        }
+    }
+} 
