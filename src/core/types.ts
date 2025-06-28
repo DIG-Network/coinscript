@@ -68,6 +68,8 @@ export function isNil(node: TreeNode): boolean {
 export interface SerializeOptions {
   // Use keywords like 'q' instead of 1
   useKeywords?: boolean;
+  // Use opcode constants from opcodes.clib (e.g., QUOTE instead of q, IF instead of i)
+  useOpcodeConstants?: boolean;
   // Output hex strings with 0x prefix
   hexPrefix?: boolean;
   // Indent nested structures

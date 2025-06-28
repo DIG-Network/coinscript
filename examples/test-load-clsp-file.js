@@ -4,7 +4,7 @@ const path = require('path');
 
 console.log('=== Loading ChiaLisp Files Demo ===\n');
 
-// Method 1: Load a predefined ChiaLisp puzzle from lib/chialisp
+// Method 1: Load a predefined ChiaLisp puzzle from src/chialisp
 console.log('1. Loading predefined puzzles from library:');
 console.log('─'.repeat(50));
 
@@ -68,13 +68,13 @@ try {
     console.error('✗ Error:', error.message);
 }
 
-// Method 3: Load from lib/chialisp directory
-console.log('\n3. Loading .clsp files from lib directory:');
+// Method 3: Load from src/chialisp directory
+console.log('\n3. Loading from file system:');
 console.log('─'.repeat(50));
 
 try {
-    // You can also load files directly from the lib/chialisp directory
-    const nftOwnershipPath = path.join(__dirname, '../lib/chialisp/nft/nft_ownership_layer.clsp');
+    // You can also load files directly from the src/chialisp directory
+    const nftOwnershipPath = path.join(__dirname, '../src/chialisp/nft/nft_ownership_layer.clsp');
     
     if (fs.existsSync(nftOwnershipPath)) {
         const nftOwnership = PuzzleBuilder.fromClsp(nftOwnershipPath);

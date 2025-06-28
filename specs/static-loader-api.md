@@ -85,7 +85,7 @@ When loading ChiaLisp files, the loader automatically detects and categorizes pa
 ### 1. Loading Standard Puzzles
 ```javascript
 // Load standard NFT ownership layer
-const nftPuzzle = PuzzleBuilder.fromClsp('lib/chialisp/nft/nft_ownership_layer.clsp');
+const nftPuzzle = PuzzleBuilder.fromClsp('src/chialisp/nft/nft_ownership_layer.clsp');
 ```
 
 ### 2. Loading Custom Puzzles
