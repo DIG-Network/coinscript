@@ -1,0 +1,91 @@
+; CLVM Opcodes
+; Named constants for all CLVM operators to improve code readability
+
+(
+    ; Core operators
+    (defconstant QUOTE q)
+    (defconstant APPLY a)
+    (defconstant IF i)
+    (defconstant CONS c)
+    (defconstant FIRST f)
+    (defconstant REST r)
+    (defconstant LISTP l)
+    (defconstant RAISE x)
+    (defconstant EQ =)
+
+    ; Math operators
+    (defconstant ADD +)
+    (defconstant SUBTRACT -)
+    (defconstant MULTIPLY *)
+    (defconstant DIVIDE /)
+    (defconstant DIVMOD divmod)
+    (defconstant GT >)
+    (defconstant GTS >s)
+
+    ; Bit operations
+    (defconstant ASH ash)
+    (defconstant LSH lsh)
+    (defconstant LOGAND logand)
+    (defconstant LOGIOR logior)
+    (defconstant LOGXOR logxor)
+    (defconstant LOGNOT lognot)
+
+    ; Logic operations
+    (defconstant NOT not)
+    (defconstant ANY any)
+    (defconstant ALL all)
+
+    ; String/byte operations
+    (defconstant STRLEN strlen)
+    (defconstant SUBSTR substr)
+    (defconstant CONCAT concat)
+
+    ; Crypto operations
+    (defconstant SHA256 sha256)
+    (defconstant SHA256TREE sha256tree)
+    (defconstant SHA256TREE1 sha256tree1)
+    (defconstant KECCAK256 keccak256)
+    (defconstant COINID coinid)
+    (defconstant SECP256K1_VERIFY secp256k1_verify)
+    (defconstant SECP256R1_VERIFY secp256r1_verify)
+
+    ; BLS operations
+    (defconstant POINT_ADD point_add)
+    (defconstant PUBKEY_FOR_EXP pubkey_for_exp)
+    (defconstant G1_ADD g1_add)
+    (defconstant G1_SUBTRACT g1_subtract)
+    (defconstant G1_MULTIPLY g1_multiply)
+    (defconstant G1_NEGATE g1_negate)
+    (defconstant BLS_VERIFY bls_verify)
+
+    ; Other operations
+    (defconstant SOFTFORK softfork)
+    (defconstant ASSERT assert)
+    (defconstant IS_ERROR is_error)
+    (defconstant CONTAINS contains)
+
+    ; Common macros and special forms
+    (defconstant MOD mod)
+    (defconstant LAMBDA lambda)
+    (defconstant DEFUN defun)
+    (defconstant DEFMACRO defmacro)
+    (defconstant DEFCONST defconst)
+
+    ; Environment references
+    (defconstant ARG @)
+    (defconstant ARG1 1)
+    (defconstant ARG2 2)
+    (defconstant ARG3 3)
+    (defconstant ARG4 4)
+    (defconstant ARG5 5)
+
+    ; Numeric constants
+    (defconstant ZERO 0)
+    (defconstant ONE 1)
+    (defconstant MINUS_ONE -1)
+
+    ; Common constants
+    (defconstant NIL ())
+    (defconstant TRUE 1)
+    (defconstant FALSE ())
+)

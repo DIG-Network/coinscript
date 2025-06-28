@@ -219,6 +219,14 @@ export class PuzzleBuilder implements ConditionBuilder {
   }
   
   /**
+   * Include CLVM opcode constants
+   */
+  includeOpcodes(): PuzzleBuilder {
+    this.featuresUsed.add('_opcodes_constants');
+    return this.include('opcodes.clib');
+  }
+  
+  /**
    * Include all standard libraries commonly used
    */
   includeStandardLibraries(): PuzzleBuilder {
