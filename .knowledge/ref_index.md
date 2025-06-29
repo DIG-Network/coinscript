@@ -177,6 +177,35 @@ This index provides a comprehensive guide to all reference documentation in the 
   - Common commands and tools
 - **When to Consult**: When learning Chia fundamentals or implementing puzzles
 
+### 14. CoinScript Inner Puzzle Syntax Recommendation
+- **File**: `./.knowledge/reference/coinscript-inner-puzzle-syntax-recommendation.md`
+- **Description**: Proposed syntax and design patterns for incorporating inner puzzles into CoinScript
+- **Key Concepts**:
+  - Three syntax approaches (explicit, decorator-based, hybrid)
+  - Inner puzzle declarations and interfaces
+  - Composition helpers and solution types
+  - Implementation phases and migration path
+  - Security considerations
+- **When to Consult**: 
+  - Designing inner puzzle features for CoinScript
+  - Understanding inner puzzle composition patterns
+  - Planning CoinScript language extensions
+
+### 15. CoinScript Inner Puzzle Implementation Guide
+- **File**: `./.knowledge/reference/coinscript-inner-puzzle-implementation-guide.md`
+- **Description**: Detailed implementation guide for converting CoinScript inner puzzle syntax to ChiaLisp
+- **Key Concepts**:
+  - Core concept translations (parameters, execution)
+  - Implementation patterns (wrappers, singletons, layers)
+  - Compiler implementation steps
+  - Code generation and currying management
+  - Testing strategies and common pitfalls
+- **When to Consult**:
+  - Implementing inner puzzle support in CoinScript compiler
+  - Understanding ChiaLisp inner puzzle generation
+  - Debugging inner puzzle compilation issues
+  - Writing tests for inner puzzle functionality
+
 ## Usage Guidelines
 
 1. **Before Implementation**: Check relevant reference files for patterns and best practices

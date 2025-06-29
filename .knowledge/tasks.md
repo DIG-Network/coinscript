@@ -1,4 +1,4 @@
-# CoinScript Implementation Tasks
+git add # CoinScript Implementation Tasks
 
 ## ✅ MAJOR FIXES COMPLETED (December 2024)
 
@@ -695,25 +695,66 @@ All critical blocking issues have been resolved. The state management system sho
 
 ## Completed Tasks - ✅
 
+### @inner_puzzle Decorator Removal
+- **Date**: 2024-12-30T03:15:00Z
+- **Description**: Removed @inner_puzzle decorator implementation
+- **Changes Made**:
+  - Removed all @inner_puzzle decorator handling from CoinScript parser
+  - Deleted hasInnerPuzzleActions tracking and routing logic
+  - Removed inner puzzle sections from generateActionPuzzle2
+  - Updated documentation to remove @inner_puzzle references
+  - Fixed state block default value generation using field.dataType
+- **Result**: Clean removal of incomplete feature, ready for proper inner puzzle syntax
+
+### Inner Puzzle Syntax Recommendation
+- **Date**: 2024-12-30T04:00:00Z
+- **Description**: Created comprehensive inner puzzle syntax recommendation for CoinScript
+- **Deliverables**:
+  - coinscript-inner-puzzle-syntax-recommendation.md - Syntax proposals
+  - coinscript-inner-puzzle-implementation-guide.md - Implementation guide
+  - Updated ref_index.md with new documents
+- **Key Proposals**:
+  - Three syntax approaches (explicit, decorator-based, hybrid)
+  - Type-safe inner puzzle composition
+  - Seamless layer integration
+  - Gradual migration path
+- **Result**: Complete design specification ready for implementation
+
 ## Current Task 🔄
-- **Date**: 2024-12-30T02:30:00Z
-- **Description**: Fixing CoinScript state management system
-- **Status**: In Progress
-- **Issues Found**:
-  - CoinScript compilation with @stateful actions returns an object that looks like PuzzleBuilder but lacks prototype methods
-  - Added state management layer application when hasStatefulActions is true
-  - Fixed infinite recursion in toPuzzleReveal() method
-  - Debug shows object is instanceof PuzzleBuilder but has empty proto and no methods
-  - When created in withStateManagementLayer: has methods (hasBuildMethod: true)
-  - When returned from withStateManagementLayer: no methods (hasMethod: false)
-  - Something happens between creation and return that strips the prototype
-- **Fixed Issues**:
-  - ✅ Fixed all TypeScript build errors
-  - ✅ Updated SolutionBuilder to use class directly or via static create()
-  - ✅ Fixed Expression type errors in tests
-  - ✅ Fixed TreeNode vs PuzzleBuilder type errors
-  - ✅ Removed unused imports
+- **Date**: 2024-12-30T04:00:00Z
+- **Description**: Created comprehensive inner puzzle syntax recommendation for CoinScript
+- **Status**: Completed
+- **Deliverables Created**:
+  - ✅ `.knowledge/reference/coinscript-inner-puzzle-syntax-recommendation.md` - Syntax proposals
+  - ✅ `.knowledge/reference/coinscript-inner-puzzle-implementation-guide.md` - Implementation guide
+  - ✅ Updated `.knowledge/ref_index.md` with new documents
+- **Analysis Performed**:
+  - Analyzed ChiaLisp inner puzzle patterns in:
+    - Singleton layer (singleton_top_layer*.clsp)
+    - CAT tokens (cat_v2.clsp)
+    - NFT layers (nft_state_layer.clsp, nft_ownership_layer.clsp)
+    - DID inner puzzles (did_innerpuz.clsp)
+  - Identified common patterns:
+    - INNER_PUZZLE as curried parameter
+    - Execution with `(a INNER_PUZZLE inner_solution)`
+    - Condition morphing for certain layers
+    - Solution nesting requirements
+- **Proposed Syntax Options**:
+  1. **Explicit Inner Puzzle Definition** - Define puzzles as first-class constructs
+  2. **Decorator-Based Routing** - Use @inner decorator for action routing
+  3. **Hybrid Approach (Recommended)** - Combine explicit definitions with layer integration
+- **Implementation Guide Covers**:
+  - Core concept translations (parameters, execution)
+  - Implementation patterns (wrappers, singletons, layers)
+  - Compiler implementation steps (AST, parsing, code gen)
+  - Testing strategies and common pitfalls
+  - Performance optimizations
+- **Key Design Decisions**:
+  - Inner puzzles as first-class language constructs
+  - Type-safe solution handling
+  - Seamless integration with existing layer system
+  - Gradual migration path for existing code
 - **Next Steps**:
-  - Find what's stripping the prototype between creation and return
-  - Fix the prototype chain issue
-  - Run all state management tests
+  - Review and refine proposed syntax based on feedback
+  - Begin implementation of basic inner puzzle support
+  - Create test suite for inner puzzle functionality
