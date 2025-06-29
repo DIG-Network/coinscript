@@ -33,7 +33,7 @@ import { SolutionBuilder } from './SolutionBuilder';
 // Type-safe condition builders
 export interface ConditionBuilder {
   // Coin creation
-  createCoin(puzzleHash: string | Uint8Array, amount: number | bigint | Expression, memo?: string | Uint8Array): PuzzleBuilder;
+  createCoin(puzzleHash: string | Uint8Array | Expression, amount: number | bigint | Expression, memo?: string | Uint8Array): PuzzleBuilder;
   
   // Signatures
   requireSignature(pubkey: string | Uint8Array, message?: Expression): PuzzleBuilder;
@@ -50,8 +50,8 @@ export interface ConditionBuilder {
   reserveFee(amount: number | bigint | Expression): PuzzleBuilder;
   
   // Announcements
-  createAnnouncement(message: string | Uint8Array): PuzzleBuilder;
-  assertAnnouncement(announcementId: string | Uint8Array): PuzzleBuilder;
+  createAnnouncement(message: string | Uint8Array | Expression): PuzzleBuilder;
+  assertAnnouncement(announcementId: string | Uint8Array | Expression): PuzzleBuilder;
   
   // Puzzle assertions
   assertMyPuzzleHash(hash: string | Uint8Array): PuzzleBuilder;
@@ -283,7 +283,7 @@ export class PuzzleBuilder implements ConditionBuilder {
   
   // === COIN OPERATIONS ===
   
-  createCoin(puzzleHash: string | Uint8Array, amount: number | bigint | Expression, memo?: string | Uint8Array): PuzzleBuilder {
+  createCoin(puzzleHash: string | Uint8Array | Expression, amount: number | bigint | Expression, memo?: string | Uint8Array): PuzzleBuilder {
     // Track feature usage
     this.featuresUsed.add('CREATE_COIN');
     
@@ -294,7 +294,9 @@ export class PuzzleBuilder implements ConditionBuilder {
     
     // Handle puzzle hash - if it's a parameter name (not hex), treat it as a variable
     let puzzleHashExpr: TreeNode;
-    if (typeof puzzleHash === 'string' && !puzzleHash.startsWith('0x') && puzzleHash.match(/^[a-zA-Z_]\w*$/)) {
+    if (puzzleHash instanceof Expression) {
+      puzzleHashExpr = puzzleHash.tree;
+    } else if (typeof puzzleHash === 'string' && !puzzleHash.startsWith('0x') && puzzleHash.match(/^[a-zA-Z_]\w*$/)) {
       // It's a variable name
       puzzleHashExpr = sym(puzzleHash);
     } else {
@@ -421,7 +423,7 @@ export class PuzzleBuilder implements ConditionBuilder {
   
   // === ANNOUNCEMENTS ===
   
-  createAnnouncement(message: string | Uint8Array): PuzzleBuilder {
+  createAnnouncement(message: string | Uint8Array | Expression): PuzzleBuilder {
     this.featuresUsed.add('CREATE_COIN_ANNOUNCEMENT');
     const opcodeExpr = this.shouldUseSymbolicConditionCode(60)
       ? sym('CREATE_COIN_ANNOUNCEMENT')
@@ -431,7 +433,7 @@ export class PuzzleBuilder implements ConditionBuilder {
     return this;
   }
   
-  assertAnnouncement(announcementId: string | Uint8Array): PuzzleBuilder {
+  assertAnnouncement(announcementId: string | Uint8Array | Expression): PuzzleBuilder {
     this.featuresUsed.add('ASSERT_COIN_ANNOUNCEMENT');
     const opcodeExpr = this.shouldUseSymbolicConditionCode(61)
       ? sym('ASSERT_COIN_ANNOUNCEMENT')
@@ -927,6 +929,72 @@ export class PuzzleBuilder implements ConditionBuilder {
   }
   
   /**
+   * Get the puzzle reveal (serialized hex) for use in spend bundles
+   * This is the compiled CLVM in hex format without 0x prefix
+   */
+  toPuzzleReveal(): string {
+    return this.serialize({ format: 'hex', compiled: true }).slice(2);
+  }
+  
+  /**
+   * Convert to ChiaLisp source code string
+   */
+  toChiaLisp(options?: { indent?: boolean }): string {
+    return this.serialize({ format: 'chialisp', indent: options?.indent });
+  }
+  
+  /**
+   * Convert to compiled CLVM hex string
+   */
+  toCLVM(): string {
+    return this.serialize({ format: 'hex', compiled: true });
+  }
+  
+  /**
+   * Create an unsigned spend bundle with this puzzle and the given solution
+   */
+  toUnsignedSpendBundle(solution: SolutionBuilder | string | TreeNode, coin: { parent_coin_info: string; amount: bigint | number; puzzle_hash?: string }): { coin_spends: unknown[]; aggregated_signature: string } {
+    const puzzleReveal = Buffer.from(this.toPuzzleReveal(), 'hex');
+    
+    // Handle different solution types
+    let solutionHex: string;
+    if (solution instanceof SolutionBuilder) {
+      solutionHex = solution.toHex().slice(2); // Remove 0x prefix
+    } else if (typeof solution === 'string') {
+      // Assume it's ChiaLisp - compile it
+      const solutionProgram = Program.fromSource(solution);
+      solutionHex = solutionProgram.serializeHex();
+    } else {
+      // TreeNode - serialize it
+      const solutionProgram = Program.fromSource(serialize(solution));
+      solutionHex = solutionProgram.serializeHex();
+    }
+    
+    const coinSpend = {
+      coin: {
+        parent_coin_info: coin.parent_coin_info,
+        puzzle_hash: coin.puzzle_hash || this.toModHash().slice(2),
+        amount: coin.amount
+      },
+      puzzleReveal,
+      solution: Buffer.from(solutionHex, 'hex')
+    };
+    
+    return {
+      coin_spends: [coinSpend],
+      aggregated_signature: '0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000'
+    };
+  }
+  
+  /**
+   * Simulate spending this puzzle with the given solution
+   * Returns the result and cost
+   */
+  simulateSpend(solution: string | SolutionBuilder | TreeNode | Program): { result: unknown; cost: number } {
+    return this.simulate(solution);
+  }
+  
+  /**
    * Build and curry the puzzle with provided values
    */
   curry(values?: Record<string, string | number | bigint | Uint8Array>): TreeNode {
@@ -985,7 +1053,7 @@ export class PuzzleBuilder implements ConditionBuilder {
    * @param filePath Path to the .clsp file
    * @returns PuzzleBuilder instance with the loaded puzzle
    */
-  static fromClsp(filePath: string): PuzzleBuilder {
+  static fromChiaLisp(filePath: string): PuzzleBuilder {
     try {
       // Read the file
       const source = readFileSync(filePath, 'utf-8');
@@ -1049,9 +1117,8 @@ export class PuzzleBuilder implements ConditionBuilder {
     try {
       // Import is deferred to avoid circular dependency
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { compileCoinScript } = require('../coinscript/parser') as {
-        compileCoinScript: (source: string) => { mainPuzzle: PuzzleBuilder };
-      };
+      const coinscriptModule = require('../coinscript/parser');
+      const compileCoinScript = coinscriptModule.compileCoinScript as (source: string) => { mainPuzzle: PuzzleBuilder };
       
       // Read the file
       const source = readFileSync(filePath, 'utf-8');
@@ -1118,7 +1185,7 @@ export class PuzzleBuilder implements ConditionBuilder {
    * Simulate running this puzzle with a given solution
    * Returns the result or throws an error with details
    */
-  simulate(solution: string | number[] | SolutionBuilder | Program): { result: unknown; cost: number } {
+  simulate(solution: string | number[] | SolutionBuilder | Program | TreeNode): { result: unknown; cost: number } {
     try {
       // Build the puzzle tree
       const puzzleTree = this.build();
@@ -1145,8 +1212,13 @@ export class PuzzleBuilder implements ConditionBuilder {
         // Get the hex and convert to Program
         const hexStr = solution.toHex();
         solutionProgram = Program.deserializeHex(hexStr);
-      } else {
+      } else if ('serializeHex' in solution && typeof solution.serializeHex === 'function') {
+        // It's already a Program
         solutionProgram = solution as Program;
+      } else {
+        // TreeNode - serialize it first
+        const solutionStr = serialize(solution as TreeNode);
+        solutionProgram = Program.fromSource(solutionStr);
       }
       
       // Run the puzzle with the solution
@@ -1191,7 +1263,7 @@ export class PuzzleBuilder implements ConditionBuilder {
    * Validate that this puzzle produces valid conditions
    * Returns true if valid, throws error if not
    */
-  validateConditions(solution: any): boolean {
+  validateConditions(solution: string | number[] | SolutionBuilder | Program | TreeNode): boolean {
     try {
       const result = this.simulate(solution);
       

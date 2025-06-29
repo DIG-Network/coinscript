@@ -498,6 +498,27 @@ All critical blocking issues have been resolved. The state management system sho
 - **Date**: 2024-12-29T19:00:00Z
 - **Description**: Created comprehensive test suite to ensure CoinScript generates compliant ChiaLisp
 - **Files Created**:
+
+### PuzzleBuilder API Standardization ✅
+- **Date**: 2024-12-30T01:00:00Z
+- **Description**: Standardized PuzzleBuilder API with new methods
+- **Changes Made**:
+  - Added instance methods:
+    - `toPuzzleReveal()` - Get compiled hex for spend bundles
+    - `toChiaLisp()` - Convert to ChiaLisp source
+    - `toCLVM()` - Get compiled CLVM hex
+    - `toUnsignedSpendBundle()` - Create unsigned spend bundle
+    - `simulateSpend()` - Simulate puzzle spending
+  - Updated static methods:
+    - `fromClsp()` → `fromChiaLisp()` (with deprecation notice)
+    - `fromCoinScript()` - Already existed
+  - Global replacements:
+    - `.serialize({ format: 'hex', compiled: true }).slice(2)` → `.toPuzzleReveal()`
+    - `.serialize({ format: 'chialisp' })` → `.toChiaLisp()`
+    - `.serialize()` → `.toChiaLisp()`
+    - `PuzzleBuilder.fromClsp(` → `PuzzleBuilder.fromChiaLisp(`
+  - **Note**: Some test files still have compilation errors due to API mismatches
+  - **Impact**: Cleaner, more intuitive API for puzzle manipulation
   - `src/__tests__/coinscript-chialisp-compliance.test.ts` - 19 comprehensive tests
   - `./.knowledge/reference/coinscript-chialisp-compliance-summary.md` - Analysis summary
 - **Test Coverage**:
@@ -652,3 +673,47 @@ All critical blocking issues have been resolved. The state management system sho
   - Simplified state management layer to debug issue
   - Issue persists, suggesting problem is elsewhere
   - Need to investigate action puzzle generation or currying mechanism
+
+# Task Tracking for ChiaLisp Puzzle Framework
+
+## Status: 2024-12-29T21:00:00Z
+
+## In Progress - 🔄
+
+### Dynamic Mod Hash Calculation
+- **Description**: Replace hardcoded STANDARD_MOD_HASHES constants with dynamic calculation from actual .clsp files
+- **Status**: 📋 Not Started
+- **Details**:
+  - Currently mod hashes are hardcoded in `src/chialisp/puzzleLibrary.ts`
+  - Should calculate from actual files in `src/chialisp/` folder
+  - Use proper sha256tree algorithm as shown in Chia docs
+  - Ensure calculated hashes match the known mainnet values
+- **Files to Update**:
+  - `src/chialisp/puzzleLibrary.ts` - Remove hardcoded constants
+  - Add proper sha256tree calculation using CLVM
+- **Priority**: Medium - Improves maintainability and accuracy
+
+## Completed Tasks - ✅
+
+## Current Task 🔄
+- **Date**: 2024-12-30T02:30:00Z
+- **Description**: Fixing CoinScript state management system
+- **Status**: In Progress
+- **Issues Found**:
+  - CoinScript compilation with @stateful actions returns an object that looks like PuzzleBuilder but lacks prototype methods
+  - Added state management layer application when hasStatefulActions is true
+  - Fixed infinite recursion in toPuzzleReveal() method
+  - Debug shows object is instanceof PuzzleBuilder but has empty proto and no methods
+  - When created in withStateManagementLayer: has methods (hasBuildMethod: true)
+  - When returned from withStateManagementLayer: no methods (hasMethod: false)
+  - Something happens between creation and return that strips the prototype
+- **Fixed Issues**:
+  - ✅ Fixed all TypeScript build errors
+  - ✅ Updated SolutionBuilder to use class directly or via static create()
+  - ✅ Fixed Expression type errors in tests
+  - ✅ Fixed TreeNode vs PuzzleBuilder type errors
+  - ✅ Removed unused imports
+- **Next Steps**:
+  - Find what's stripping the prototype between creation and return
+  - Fix the prototype chain issue
+  - Run all state management tests

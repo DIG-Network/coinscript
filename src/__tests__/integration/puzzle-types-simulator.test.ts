@@ -8,7 +8,6 @@
 import { 
   CoinSpend, 
   getCoinId, 
-  masterPublicKeyToWalletSyntheticKey, 
   masterSecretKeyToWalletSyntheticSecretKey, 
   Peer, 
   PeerType, 
@@ -19,16 +18,16 @@ import {
 import * as bip39 from 'bip39';
 import { mnemonicToSeedSync } from 'bip39';
 import { PrivateKey } from 'chia-bls';
-import { PuzzleBuilder, puzzle } from '../../builder/PuzzleBuilder';
-import { createSolution } from '../../builder/SolutionBuilder';
+import { puzzle, variable } from '../../builder/PuzzleBuilder';
+import { SolutionBuilder } from '../../builder/SolutionBuilder';
 import { serialize } from '../../core/serializer';
 import { Program } from 'clvm-lib';
 import { compileCoinScript } from '../../coinscript';
 import { withSingletonLayer } from '../../layers/singletonLayer';
 import { withOwnershipLayer } from '../../layers/ownershipLayer';
 import { withStateLayer } from '../../layers/stateLayer';
-import { hex, list, int } from '../../core';
-import { createCoin, createCoinAnnouncement, reserveFee } from '../../conditions';
+// Note: TreeNode helpers like hex, list, int are handled via PuzzleBuilder methods
+// Note: conditions are handled via PuzzleBuilder methods
 
 describe('Puzzle Types with Real Chia Simulator', () => {
   let peer: Peer;
@@ -36,7 +35,7 @@ describe('Puzzle Types with Real Chia Simulator', () => {
   let masterSecretKey: Buffer;
   let masterSyntheticSecretKey: Buffer;
   let masterPublicKey: Buffer;
-  let masterSyntheticPublicKey: Buffer;
+
 
   beforeAll(async () => {
     // Initialize TLS and Peer - use default certificates if available
@@ -64,7 +63,6 @@ describe('Puzzle Types with Real Chia Simulator', () => {
     masterSecretKey = Buffer.from(PrivateKey.fromSeed(seed).toHex(), "hex");
     masterSyntheticSecretKey = masterSecretKeyToWalletSyntheticSecretKey(masterSecretKey);
     masterPublicKey = secretKeyToPublicKey(masterSecretKey);
-    masterSyntheticPublicKey = masterPublicKeyToWalletSyntheticKey(masterPublicKey);
   });
 
   afterAll(async () => {
@@ -85,19 +83,22 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       const paymentPuzzle = puzzle()
         .comment('Standard payment puzzle')
         .requireSignature(masterPublicKey)
-        .ifConditions('amount', 'recipient')
-        .then(builder => 
+        .if(variable('amount').greaterThan(0))
+        .then(builder => {
           builder
-            .createCoin('recipient', 'amount')
-            .returnConditions()
-        )
+            .createCoin('recipient', variable('amount'))
+            .returnConditions();
+        })
         .build();
       
+      // Create a temporary PuzzleBuilder to get methods
+      const paymentPuzzleBuilder = puzzle().withMod(paymentPuzzle);
+      
       const puzzleReveal = Buffer.from(
-        paymentPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        paymentPuzzleBuilder.toPuzzleReveal(), 
         'hex'
       );
-      const puzzleHash = paymentPuzzle.toModHash();
+      const puzzleHash = paymentPuzzleBuilder.toModHash();
       console.log(`📝 Payment puzzle hash: ${puzzleHash}`);
       
       // Create initial coin
@@ -109,9 +110,9 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       const recipientAddress = '0x' + 'cafe'.repeat(16);
       const sendAmount = 2000n;
       
-      const solution = createSolution()
-        .addParam('amount', Number(sendAmount))
-        .addParam('recipient', recipientAddress)
+      const solution = new SolutionBuilder()
+        .add(Number(sendAmount))
+        .add(recipientAddress)
         .build();
       
       const solutionProgram = Program.fromSource(serialize(solution));
@@ -150,36 +151,28 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       const multiPaymentPuzzle = puzzle()
         .comment('Multi-payment puzzle')
         .requireSignature(masterPublicKey)
-        .ifConditions('payments')
-        .then(builder => {
-          // In real implementation, would iterate through payments list
-          // For demo, we'll hardcode 3 payments
-          builder
-            .createCoin(hex('1111'.repeat(16)), int(1000))
-            .createCoin(hex('2222'.repeat(16)), int(1500))
-            .createCoin(hex('3333'.repeat(16)), int(2500))
-            .returnConditions();
-          return builder;
-        })
+        .createCoin('0x' + '1111'.repeat(16), 1000)
+        .createCoin('0x' + '2222'.repeat(16), 1500)
+        .createCoin('0x' + '3333'.repeat(16), 2500)
+        .returnConditions()
         .build();
       
+      // Create a temporary PuzzleBuilder to get methods
+      const multiPaymentPuzzleBuilder = puzzle().withMod(multiPaymentPuzzle);
+      
       const puzzleReveal = Buffer.from(
-        multiPaymentPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        multiPaymentPuzzleBuilder.toPuzzleReveal(), 
         'hex'
       );
-      const puzzleHash = multiPaymentPuzzle.toModHash();
+      const puzzleHash = multiPaymentPuzzleBuilder.toModHash();
       
       // Create initial coin
       const coin = await peer.simulatorNewCoin(Buffer.from(puzzleHash.slice(2), 'hex'), 5000n);
       console.log(`💰 Created multi-payment coin with 5000 mojos`);
       
       // Create solution
-      const solution = createSolution()
-        .addParam('payments', [
-          { recipient: '0x' + '1111'.repeat(16), amount: 1000 },
-          { recipient: '0x' + '2222'.repeat(16), amount: 1500 },
-          { recipient: '0x' + '3333'.repeat(16), amount: 2500 }
-        ])
+      const solution = new SolutionBuilder()
+        .add(1) // Just add a dummy parameter since the puzzle has no params
         .build();
       
       const solutionProgram = Program.fromSource(serialize(solution));
@@ -213,24 +206,17 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       const innerPuzzle = puzzle()
         .comment('Singleton inner puzzle')
         .requireSignature(masterPublicKey)
-        .ifConditions('action')
-        .then(builder => 
-          builder
-            .comment('Process singleton action')
-            .returnConditions()
-        )
+        .returnConditions()
         .build();
       
       // Generate launcher ID (random for testing)
       const launcherId = Buffer.from('launcher123456789012345678901234567890123456789012345678901234567890', 'hex');
       
-      // Wrap with singleton layer
-      const singletonPuzzle = withSingletonLayer(innerPuzzle, {
-        launcherId: launcherId.toString('hex')
-      });
+      // Wrap with singleton layer - pass string not object
+      const singletonPuzzle = withSingletonLayer(innerPuzzle, launcherId.toString('hex'));
       
       const puzzleReveal = Buffer.from(
-        singletonPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        singletonPuzzle.toPuzzleReveal(), 
         'hex'
       );
       const puzzleHash = singletonPuzzle.toModHash();
@@ -241,8 +227,8 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       console.log(`🎯 Created singleton coin: ${getCoinId(coin).toString('hex').substring(0, 16)}...`);
       
       // Create solution
-      const solution = createSolution()
-        .addParam('action', 'update')
+      const solution = new SolutionBuilder()
+        .add('update')
         .build();
       
       const solutionProgram = Program.fromSource(serialize(solution));
@@ -301,7 +287,7 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       
       const compiled = compileCoinScript(catContractSource);
       const puzzleReveal = Buffer.from(
-        compiled.mainPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        compiled.mainPuzzle.toPuzzleReveal(), 
         'hex'
       );
       const puzzleHash = compiled.mainPuzzle.toModHash();
@@ -316,7 +302,7 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       const recipientAddress = '0x' + 'feed'.repeat(16);
       const transferAmount = 2500n;
       
-      const solution = createSolution()
+      const solution = new SolutionBuilder()
         .addAction('transfer', [recipientAddress, Number(transferAmount)])
         .build();
       
@@ -383,7 +369,7 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       
       const compiled = compileCoinScript(nftContractSource);
       const puzzleReveal = Buffer.from(
-        compiled.mainPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        compiled.mainPuzzle.toPuzzleReveal(), 
         'hex'
       );
       const puzzleHash = compiled.mainPuzzle.toModHash();
@@ -396,7 +382,7 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       // Transfer NFT to new owner
       const newOwner = '0x' + 'babe'.repeat(16);
       
-      const solution = createSolution()
+      const solution = new SolutionBuilder()
         .addAction('transfer', [newOwner])
         .build();
       
@@ -484,7 +470,7 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       
       const compiled = compileCoinScript(didContractSource);
       const puzzleReveal = Buffer.from(
-        compiled.mainPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        compiled.mainPuzzle.toPuzzleReveal(), 
         'hex'
       );
       const puzzleHash = compiled.mainPuzzle.toModHash();
@@ -501,7 +487,7 @@ describe('Puzzle Types with Real Chia Simulator', () => {
         status: "active"
       };
       
-      const solution = createSolution()
+      const solution = new SolutionBuilder()
         .addAction('updateEndpoint', ["https://newservice.com/did"])
         .addState(initialState)
         .build();
@@ -543,12 +529,7 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       const basePuzzle = puzzle()
         .comment('Base functionality')
         .requireSignature(masterPublicKey)
-        .ifConditions('action', 'params')
-        .then(builder => 
-          builder
-            .comment('Execute action')
-            .returnConditions()
-        )
+        .returnConditions()
         .build();
       
       // Add ownership layer
@@ -563,20 +544,15 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       
       // Add state layer
       const withState = withStateLayer(withOwnership, {
-        initialState: list([
-          int(0), // counter
-          hex('0000000000000000000000000000000000000000000000000000000000000000'), // last action
-          int(0) // timestamp
-        ]),
-        stateUpdater: puzzle()
-          .comment('State updater')
-          .validateState('old_state', 'new_state')
-          .returnConditions()
-          .build()
+        initialState: {
+          counter: 0,
+          lastAction: '0000000000000000000000000000000000000000000000000000000000000000',
+          timestamp: 0
+        }
       });
       
       const puzzleReveal = Buffer.from(
-        withState.serialize({ format: 'hex', compiled: true }).slice(2), 
+        withState.toPuzzleReveal(), 
         'hex'
       );
       const puzzleHash = withState.toModHash();
@@ -587,9 +563,12 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       console.log(`🎭 Created multi-layer coin`);
       
       // Create solution
-      const solution = createSolution()
-        .addParam('action', 'execute')
-        .addParam('params', { operation: 'test' })
+      const solution = new SolutionBuilder()
+        .add('execute')
+        .addList(b => {
+          b.add('operation');
+          b.add('test');
+        })
         .build();
       
       const solutionProgram = Program.fromSource(serialize(solution));
@@ -628,36 +607,28 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       const senderPuzzle = puzzle()
         .comment('Message sender')
         .requireSignature(masterPublicKey)
-        .ifConditions('message', 'recipient')
-        .then(builder => 
-          builder
-            .createCoinAnnouncement('message')
-            .createCoin('recipient', int(1))
-            .returnConditions()
-        )
-        .build();
+        .withSolutionParams('message', 'recipient')
+        .createAnnouncement(variable('message'))
+        .createCoin(variable('recipient'), 1)
+        .returnConditions();
       
       // Create receiver puzzle that listens for announcements
       const receiverPuzzle = puzzle()
         .comment('Message receiver')
         .requireSignature(masterPublicKey)
-        .ifConditions('expected_message')
-        .then(builder => 
-          builder
-            .assertCoinAnnouncement('expected_message')
-            .comment('Message received and validated')
-            .returnConditions()
-        )
-        .build();
+        .withSolutionParams('expected_message')
+        .assertAnnouncement(variable('expected_message'))
+        .comment('Message received and validated')
+        .returnConditions();
       
       const senderReveal = Buffer.from(
-        senderPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        senderPuzzle.toPuzzleReveal(), 
         'hex'
       );
       const senderHash = senderPuzzle.toModHash();
       
       const receiverReveal = Buffer.from(
-        receiverPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        receiverPuzzle.toPuzzleReveal(), 
         'hex'
       );
       const receiverHash = receiverPuzzle.toModHash();
@@ -672,13 +643,13 @@ describe('Puzzle Types with Real Chia Simulator', () => {
       // Create coordinated solutions
       const message = "Hello from sender!";
       
-      const senderSolution = createSolution()
-        .addParam('message', message)
-        .addParam('recipient', receiverHash)
+      const senderSolution = new SolutionBuilder()
+        .add(message)
+        .add(receiverHash)
         .build();
       
-      const receiverSolution = createSolution()
-        .addParam('expected_message', message)
+      const receiverSolution = new SolutionBuilder()
+        .add(message)
         .build();
       
       const senderProgram = Program.fromSource(serialize(senderSolution));
@@ -730,9 +701,8 @@ describe('Puzzle Types with Real Chia Simulator', () => {
           name: 'Standard Payment',
           create: () => puzzle()
             .requireSignature(masterPublicKey)
-            .createCoin(hex('dead'.repeat(16)), int(1))
+            .createCoin('0x' + 'dead'.repeat(16), 1)
             .returnConditions()
-            .build()
         },
         {
           name: 'CoinScript Simple',
@@ -780,7 +750,7 @@ describe('Puzzle Types with Real Chia Simulator', () => {
         // Create puzzle
         const testPuzzle = puzzleType.create();
         const puzzleReveal = Buffer.from(
-          testPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+          testPuzzle.toPuzzleReveal(), 
           'hex'
         );
         const puzzleHash = testPuzzle.toModHash();
@@ -789,11 +759,11 @@ describe('Puzzle Types with Real Chia Simulator', () => {
         const coin = await peer.simulatorNewCoin(Buffer.from(puzzleHash.slice(2), 'hex'), 100n);
         
         const solution = puzzleType.name.includes('Stateful') 
-          ? createSolution()
+          ? new SolutionBuilder()
               .addAction('increment')
               .addState({ counter: 0 })
               .build()
-          : createSolution()
+          : new SolutionBuilder()
               .addAction('spend')
               .build();
         

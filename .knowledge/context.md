@@ -119,7 +119,7 @@ else if (ACTION == 'approve') { /* approve logic */ }
 **Decorators**: Modify compilation behavior
 - `@singleton`: Wraps with singleton layer
 - `@stateful`: Enables state access, adds state parameter
-- `@inner_puzzle`: Routes to curried inner puzzle
+
 
 ## 4. Layer System (`/src/layers/`)
 

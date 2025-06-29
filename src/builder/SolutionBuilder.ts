@@ -95,6 +95,13 @@ export class SolutionBuilder {
   private structureType: 'list' | 'cons' | 'raw' = 'list';
   
   /**
+   * Static constructor for creating a new SolutionBuilder
+   */
+  static create(): SolutionBuilder {
+    return new SolutionBuilder();
+  }
+  
+  /**
    * Add a raw value to the solution
    */
   add(value: string | number | bigint | Uint8Array | TreeNode | SolutionBuilder | boolean): SolutionBuilder {
@@ -236,6 +243,13 @@ export class SolutionBuilder {
   }
   
   /**
+   * Convert to ChiaLisp source code string
+   */
+  toChiaLisp(options?: { indent?: boolean }): string {
+    return serialize(this.build(), options);
+  }
+  
+  /**
    * Serialize to hex (for use in spend bundles)
    */
   toHex(): string {
@@ -309,12 +323,3 @@ function toTree(value: string | number | bigint | Uint8Array | TreeNode | Soluti
   }
   return value;
 }
-
-// Factory functions
-export function createSolution(): SolutionBuilder {
-  return new SolutionBuilder();
-}
-
-export function createConditions(): ConditionListBuilder {
-  return new ConditionListBuilder();
-} 

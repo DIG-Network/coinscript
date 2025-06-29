@@ -50,8 +50,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       const original = '(mod () 42)';
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       // Should preserve the basic structure
       expect(exported).toContain('(mod ()');
@@ -62,8 +62,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       const original = '(mod (x) x)';
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       expect(exported).toContain('(mod (x)');
       expect(exported).toContain('x)');
@@ -73,8 +73,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       const original = '(mod (a b c) (+ a (+ b c)))';
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       expect(exported).toContain('(mod (a b c)');
       expect(exported).toContain('(+ a (+ b c))');
@@ -84,8 +84,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       const original = '(mod (x) (if (> x 10) 100 200))';
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       expect(exported).toContain('(mod (x)');
       // 'if' is preserved in ChiaLisp, not converted to 'i'
@@ -96,8 +96,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       const original = '(mod (x y) (if (> x 0) (if (> y 0) 1 2) (if (< y 0) 3 4)))';
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       expect(exported).toContain('(if (> x 0)');
       expect(exported).toContain('(if (> y 0) 1 2)');
@@ -108,8 +108,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       const original = '(mod (lst) (c (f lst) (r lst)))';
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       expect(exported).toContain('(c (f lst) (r lst))');
     });
@@ -118,8 +118,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       const original = '(mod (data) (sha256 data))';
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       expect(exported).toContain('(sha256 data)');
     });
@@ -128,8 +128,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       const original = '(mod (a b c) (* (+ a b) (- c 1)))';
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       expect(exported).toContain('(* (+ a b) (- c 1))');
     });
@@ -138,8 +138,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       const original = "(mod () (q . 42))";
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       expect(exported).toContain('42');
     });
@@ -148,8 +148,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       const original = '(mod () 0xdeadbeef)';
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       expect(exported).toContain('0xdeadbeef');
     });
@@ -158,8 +158,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       const original = '(mod ()\n  (include condition_codes.clib)\n  (list CREATE_COIN 0x1234 100)\n)';
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       expect(exported).toContain('(include condition_codes.clib)');
       expect(exported).toContain('CREATE_COIN');
@@ -169,8 +169,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       const original = '(mod (x)\n  (defun double (n) (* n 2))\n  (double x)\n)';
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       expect(exported).toContain('(defun double (n) (* n 2))');
       expect(exported).toContain('(double x)');
@@ -180,8 +180,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       const original = '(mod ()\n  (defmacro ASSERT items\n    (if (r items)\n      (list if (f items) (c ASSERT (r items)) (q . (x)))\n      (f items)\n    )\n  )\n  (ASSERT 1)\n)';
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       expect(exported).toContain('(defmacro ASSERT');
     });
@@ -190,8 +190,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       const original = '(mod ()\n  (defconstant VERSION 1)\n  VERSION\n)';
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       expect(exported).toContain('(defconstant VERSION 1)');
       expect(exported).toContain('VERSION');
@@ -212,8 +212,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
 )`;
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       // PUBKEY gets converted to hex
       expect(exported).toContain('(mod (0x');
@@ -229,14 +229,14 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       // ChiaLisp version
       const chiaLisp = '(mod () 42)';
       const clspFile = createTempFile(chiaLisp);
-      const fromChiaLisp = PuzzleBuilder.fromClsp(clspFile);
+      const fromChiaLisp = PuzzleBuilder.fromChiaLisp(clspFile);
       
       // CoinScript version
       const fromCoinScript = puzzle().returnValue(42);
       
       // Compare serialized output
-      const chiaLispOutput = fromChiaLisp.serialize();
-      const coinScriptOutput = fromCoinScript.serialize();
+      const chiaLispOutput = fromChiaLisp.toChiaLisp();
+      const coinScriptOutput = fromCoinScript.toChiaLisp();
       
       // Both should produce equivalent structures
       expect(chiaLispOutput).toContain('42');
@@ -247,7 +247,7 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       // ChiaLisp version
       const chiaLisp = '(mod (x) x)';
       const clspFile = createTempFile(chiaLisp);
-      const fromChiaLisp = PuzzleBuilder.fromClsp(clspFile);
+      const fromChiaLisp = PuzzleBuilder.fromChiaLisp(clspFile);
       
       // CoinScript version
       const fromCoinScript = puzzle()
@@ -255,8 +255,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
         .returnValue(variable('x'));
       
       // Compare outputs
-      const chiaLispOutput = fromChiaLisp.serialize();
-      const coinScriptOutput = fromCoinScript.serialize();
+      const chiaLispOutput = fromChiaLisp.toChiaLisp();
+      const coinScriptOutput = fromCoinScript.toChiaLisp();
       
       expect(chiaLispOutput).toContain('(mod (x)');
       expect(chiaLispOutput).toContain('x)');
@@ -268,7 +268,7 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       // ChiaLisp version
       const chiaLisp = '(mod (a b) (+ a b))';
       const clspFile = createTempFile(chiaLisp);
-      const fromChiaLisp = PuzzleBuilder.fromClsp(clspFile);
+      const fromChiaLisp = PuzzleBuilder.fromChiaLisp(clspFile);
       
       // CoinScript version
       const fromCoinScript = puzzle()
@@ -276,8 +276,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
         .returnValue(variable('a').add(variable('b')));
       
       // Compare outputs
-      const chiaLispOutput = fromChiaLisp.serialize();
-      const coinScriptOutput = fromCoinScript.serialize();
+      const chiaLispOutput = fromChiaLisp.toChiaLisp();
+      const coinScriptOutput = fromCoinScript.toChiaLisp();
       
       expect(chiaLispOutput).toContain('(+ a b)');
       expect(coinScriptOutput).toContain('(+ a b)');
@@ -287,7 +287,7 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       // ChiaLisp version
       const chiaLisp = '(mod (x) (if (> x 0) 1 -1))';
       const clspFile = createTempFile(chiaLisp);
-      const fromChiaLisp = PuzzleBuilder.fromClsp(clspFile);
+      const fromChiaLisp = PuzzleBuilder.fromChiaLisp(clspFile);
       
       // CoinScript version - this compiles to 'i' operator
       const fromCoinScript = puzzle()
@@ -297,8 +297,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
           .else(b => b.returnValue(-1));
       
       // Compare outputs
-      const chiaLispOutput = fromChiaLisp.serialize();
-      const coinScriptOutput = fromCoinScript.serialize();
+      const chiaLispOutput = fromChiaLisp.toChiaLisp();
+      const coinScriptOutput = fromCoinScript.toChiaLisp();
       
       // ChiaLisp preserves 'if', CoinScript uses 'i'
       expect(chiaLispOutput).toContain('(if (> x 0)');
@@ -314,7 +314,7 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
   )
 )`;
       const clspFile = createTempFile(chiaLisp);
-      const fromChiaLisp = PuzzleBuilder.fromClsp(clspFile);
+      const fromChiaLisp = PuzzleBuilder.fromChiaLisp(clspFile);
       
       // CoinScript version
       const fromCoinScript = puzzle()
@@ -328,8 +328,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       );
       
       // Compare outputs
-      const chiaLispOutput = fromChiaLisp.serialize();
-      const coinScriptOutput = fromCoinScript.serialize();
+      const chiaLispOutput = fromChiaLisp.toChiaLisp();
+      const coinScriptOutput = fromCoinScript.toChiaLisp();
       
       // Both should include condition codes and CREATE_COIN
       expect(chiaLispOutput).toContain('(include condition_codes.clib)');
@@ -342,7 +342,7 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       // ChiaLisp version
       const chiaLisp = '(mod (a b c) (* (+ a b) c))';
       const clspFile = createTempFile(chiaLisp);
-      const fromChiaLisp = PuzzleBuilder.fromClsp(clspFile);
+      const fromChiaLisp = PuzzleBuilder.fromChiaLisp(clspFile);
       
       // CoinScript version
       const fromCoinScript = puzzle()
@@ -352,8 +352,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
         );
       
       // Compare outputs
-      const chiaLispOutput = fromChiaLisp.serialize();
-      const coinScriptOutput = fromCoinScript.serialize();
+      const chiaLispOutput = fromChiaLisp.toChiaLisp();
+      const coinScriptOutput = fromCoinScript.toChiaLisp();
       
       expect(chiaLispOutput).toContain('(* (+ a b) c)');
       expect(coinScriptOutput).toContain('(* (+ a b) c)');
@@ -363,7 +363,7 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       // ChiaLisp version
       const chiaLisp = '(mod (head tail) (c head tail))';
       const clspFile = createTempFile(chiaLisp);
-      const fromChiaLisp = PuzzleBuilder.fromClsp(clspFile);
+      const fromChiaLisp = PuzzleBuilder.fromChiaLisp(clspFile);
       
       // CoinScript version
       const fromCoinScript = puzzle()
@@ -374,8 +374,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       );
       
       // Compare outputs
-      const chiaLispOutput = fromChiaLisp.serialize();
-      const coinScriptOutput = fromCoinScript.serialize();
+      const chiaLispOutput = fromChiaLisp.toChiaLisp();
+      const coinScriptOutput = fromCoinScript.toChiaLisp();
       
       expect(chiaLispOutput).toContain('(c head tail)');
       expect(coinScriptOutput).toContain('(c head tail)');
@@ -385,7 +385,7 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       // ChiaLisp version
       const chiaLisp = '(mod (data) (sha256 data))';
       const clspFile = createTempFile(chiaLisp);
-      const fromChiaLisp = PuzzleBuilder.fromClsp(clspFile);
+      const fromChiaLisp = PuzzleBuilder.fromChiaLisp(clspFile);
       
       // CoinScript version
       const fromCoinScript = puzzle()
@@ -393,8 +393,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
         .returnValue(variable('data').sha256());
       
       // Compare outputs
-      const chiaLispOutput = fromChiaLisp.serialize();
-      const coinScriptOutput = fromCoinScript.serialize();
+      const chiaLispOutput = fromChiaLisp.toChiaLisp();
+      const coinScriptOutput = fromCoinScript.toChiaLisp();
       
       expect(chiaLispOutput).toContain('(sha256 data)');
       expect(coinScriptOutput).toContain('(sha256 data)');
@@ -404,7 +404,7 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       // ChiaLisp version
       const chiaLisp = '(mod (x y) (if (> x 0) (if (> y 0) "positive" "mixed") "negative"))';
       const clspFile = createTempFile(chiaLisp);
-      const fromChiaLisp = PuzzleBuilder.fromClsp(clspFile);
+      const fromChiaLisp = PuzzleBuilder.fromChiaLisp(clspFile);
       
       // CoinScript version
       const fromCoinScript = puzzle()
@@ -418,8 +418,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
           .else(b => b.returnValue("negative"));
       
       // Compare outputs
-      const chiaLispOutput = fromChiaLisp.serialize();
-      const coinScriptOutput = fromCoinScript.serialize();
+      const chiaLispOutput = fromChiaLisp.toChiaLisp();
+      const coinScriptOutput = fromCoinScript.toChiaLisp();
       
       // ChiaLisp preserves 'if', CoinScript uses 'i'
       expect(chiaLispOutput).toContain('(if (> x 0)');
@@ -432,14 +432,14 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
       // ChiaLisp version
       const chiaLisp = '(mod conditions conditions)';
       const clspFile = createTempFile(chiaLisp);
-      const fromChiaLisp = PuzzleBuilder.fromClsp(clspFile);
+      const fromChiaLisp = PuzzleBuilder.fromChiaLisp(clspFile);
       
       // CoinScript version
       const fromCoinScript = puzzle().payToConditions();
       
       // Compare outputs - both should be functionally equivalent
-      const chiaLispOutput = fromChiaLisp.serialize();
-      const coinScriptOutput = fromCoinScript.serialize();
+      const chiaLispOutput = fromChiaLisp.toChiaLisp();
+      const coinScriptOutput = fromCoinScript.toChiaLisp();
       
       // The exact representation might differ but both return the conditions parameter
       expect(chiaLispOutput).toContain('conditions');
@@ -463,8 +463,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
 )`;
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       // Verify key components are preserved
       expect(exported).toContain('(include condition_codes.clib)');
@@ -498,8 +498,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
 )`;
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       // Verify structure is preserved
       expect(exported).toContain('(= action 1)');
@@ -549,8 +549,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
 )`;
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       // Verify all operators are preserved
       const operators = ['+', '-', '*', '/', 'divmod', '=', '>', '>s', 
@@ -576,8 +576,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
 )`;
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       expect(exported).toContain('(include condition_codes.clib)');
       expect(exported).toContain('(include singleton_truths.clib)');
@@ -618,8 +618,8 @@ describe('PuzzleBuilder - Round-trip Tests (Fixed)', () => {
 )`;
       const file = createTempFile(original);
       
-      const loaded = PuzzleBuilder.fromClsp(file);
-      const exported = loaded.serialize();
+      const loaded = PuzzleBuilder.fromChiaLisp(file);
+      const exported = loaded.toChiaLisp();
       
       // Verify deeply nested structure is preserved
       const ifCount = (exported.match(/\(if /g) || []).length;

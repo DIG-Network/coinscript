@@ -22,9 +22,7 @@ export {
 // Export SolutionBuilder and factories
 export {
   SolutionBuilder,
-  ConditionListBuilder,
-  createSolution,
-  createConditions
+  ConditionListBuilder
 } from './SolutionBuilder';
 
 // Re-export type for convenience

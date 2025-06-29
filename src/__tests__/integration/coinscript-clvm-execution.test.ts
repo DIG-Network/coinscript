@@ -50,7 +50,7 @@ describe('CoinScript CLVM Execution Tests', () => {
       
       // Get the ChiaLisp code and solution
       const chialisp = puzzle.serialize({ format: 'chialisp', compiled: false });
-      const solutionStr = solutionBuilder.serialize();
+      const solutionStr = solutionBuilder.toChiaLisp();
       
       // The compiled output should contain CREATE_COIN condition
       expect(chialisp).toContain('CREATE_COIN');
@@ -120,7 +120,7 @@ describe('CoinScript CLVM Execution Tests', () => {
         .add(signer1)
         .add(signer2);
       
-      const solution = solutionBuilder.serialize();
+      const solution = solutionBuilder.toChiaLisp();
       
       // Verify solution structure
       expect(solution).toContain('spend');

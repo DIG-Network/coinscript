@@ -34,7 +34,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
 
     test('should build puzzle without mod wrapper when noMod is called', () => {
       const p = puzzle().noMod().createCoin(TEST_ADDRESS, TEST_AMOUNT);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).not.toContain('mod');
       // When noMod is used, symbolic names are still used if includes are auto-added
       expect(serialized).toContain('CREATE_COIN');
@@ -42,7 +42,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
 
     test('should build puzzle with mod wrapper by default', () => {
       const p = puzzle().createCoin(TEST_ADDRESS, TEST_AMOUNT);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('mod');
       expect(serialized).toContain('CREATE_COIN'); // Uses symbolic name with includes
     });
@@ -54,7 +54,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
       const tree = p.build();
       expect(isList(tree)).toBe(true);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('CREATE_COIN');
       expect(serialized).toContain(TEST_ADDRESS);
       expect(serialized).toContain(TEST_AMOUNT.toString());
@@ -63,7 +63,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
     test('should create coin with memo', () => {
       const memo = '0x' + 'c'.repeat(64);
       const p = puzzle().createCoin(TEST_ADDRESS, TEST_AMOUNT, memo);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('CREATE_COIN');
       expect(serialized).toContain(TEST_ADDRESS);
       expect(serialized).toContain(TEST_AMOUNT.toString());
@@ -74,14 +74,14 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
       const p = puzzle()
         .withSolutionParams('recipient')
         .createCoin('recipient', TEST_AMOUNT);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('recipient');
       expect(serialized).not.toContain('0xrecipient');
     });
 
     test('should reserve fee', () => {
       const p = puzzle().reserveFee(10);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('RESERVE_FEE');
       expect(serialized).toContain('10');
     });
@@ -92,7 +92,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
         .createCoin('0x' + 'd'.repeat(64), 400)
         .reserveFee(100);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized.match(/CREATE_COIN/g)?.length).toBe(2);
       expect(serialized).toContain('RESERVE_FEE');
     });
@@ -101,14 +101,14 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
   describe('Signatures', () => {
     test('should require signature', () => {
       const p = puzzle().requireSignature(TEST_PUBKEY);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('AGG_SIG_ME');
       expect(serialized).toContain(TEST_PUBKEY);
     });
 
     test('should require signature with custom message', () => {
       const p = puzzle().requireSignature(TEST_PUBKEY, expr('custom message'));
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('AGG_SIG_ME');
       expect(serialized).toContain(TEST_PUBKEY);
       // The custom message might be encoded differently
@@ -116,14 +116,14 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
 
     test('should require unsafe signature', () => {
       const p = puzzle().requireSignatureUnsafe(TEST_PUBKEY, expr('unsafe message'));
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('AGG_SIG_UNSAFE');
       expect(serialized).toContain(TEST_PUBKEY);
     });
 
     test('should use requireMySignature alias', () => {
       const p = puzzle().requireMySignature(TEST_PUBKEY);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('AGG_SIG_ME');
       expect(serialized).toContain(TEST_PUBKEY);
     });
@@ -132,28 +132,28 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
   describe('Time Locks', () => {
     test('should require after seconds', () => {
       const p = puzzle().requireAfterSeconds(3600);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('ASSERT_SECONDS_RELATIVE');
       expect(serialized).toContain('3600');
     });
 
     test('should require after height', () => {
       const p = puzzle().requireAfterHeight(1000000);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('ASSERT_HEIGHT_RELATIVE');
       expect(serialized).toContain('1000000');
     });
 
     test('should require before seconds', () => {
       const p = puzzle().requireBeforeSeconds(7200);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('ASSERT_SECONDS_ABSOLUTE');
       expect(serialized).toContain('7200');
     });
 
     test('should require before height', () => {
       const p = puzzle().requireBeforeHeight(2000000);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('ASSERT_HEIGHT_ABSOLUTE');
       expect(serialized).toContain('2000000');
     });
@@ -163,7 +163,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
         .requireAfterSeconds(3600)
         .requireBeforeSeconds(7200);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('ASSERT_SECONDS_RELATIVE');
       expect(serialized).toContain('ASSERT_SECONDS_ABSOLUTE');
       expect(serialized).toContain('3600');
@@ -174,7 +174,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
   describe('Announcements', () => {
     test('should create announcement', () => {
       const p = puzzle().createAnnouncement('hello world');
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('CREATE_COIN_ANNOUNCEMENT');
       // Note: 'hello world' might be hex encoded
     });
@@ -182,7 +182,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
     test('should assert announcement', () => {
       const announcementId = '0x' + 'f'.repeat(64);
       const p = puzzle().assertAnnouncement(announcementId);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('ASSERT_COIN_ANNOUNCEMENT');
       expect(serialized).toContain(announcementId);
     });
@@ -192,7 +192,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
         .createAnnouncement('test message')
         .assertAnnouncement('0x' + '1'.repeat(64));
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('CREATE_COIN_ANNOUNCEMENT');
       expect(serialized).toContain('ASSERT_COIN_ANNOUNCEMENT');
     });
@@ -202,7 +202,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
     test('should assert puzzle hash', () => {
       const hash = '0x' + '2'.repeat(64);
       const p = puzzle().assertMyPuzzleHash(hash);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('ASSERT_MY_PUZZLEHASH');
       expect(serialized).toContain(hash);
     });
@@ -210,7 +210,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
     test('should assert coin id', () => {
       const coinId = '0x' + '3'.repeat(64);
       const p = puzzle().assertMyCoinId(coinId);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('ASSERT_MY_COIN_ID');
       expect(serialized).toContain(coinId);
     });
@@ -220,7 +220,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
         .assertMyPuzzleHash('0x' + 'a'.repeat(64))
         .assertMyCoinId('0x' + 'b'.repeat(64));
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('ASSERT_MY_PUZZLEHASH');
       expect(serialized).toContain('ASSERT_MY_COIN_ID');
     });
@@ -229,7 +229,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
   describe('Raw Conditions', () => {
     test('should add raw condition with opcode', () => {
       const p = puzzle().addCondition(51, TEST_ADDRESS, 100);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('CREATE_COIN'); // Gets converted to symbolic
       expect(serialized).toContain(TEST_ADDRESS);
       expect(serialized).toContain('100');
@@ -237,7 +237,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
 
     test('should add raw condition with multiple arguments', () => {
       const p = puzzle().addCondition(63, '0x' + '1'.repeat(64), expr('test'), 42);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('ASSERT_PUZZLE_ANNOUNCEMENT');
       expect(serialized).toContain('0x' + '1'.repeat(64));
       expect(serialized).toContain('42');
@@ -247,7 +247,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
   describe('Standard Puzzles', () => {
     test('should create pay to conditions puzzle', () => {
       const p = puzzle().payToConditions();
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('mod');
       // The implementation uses "1" instead of "conditions"
       expect(serialized).toContain('"1"'); // Solution is first argument
@@ -255,7 +255,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
 
     test('should create pay to public key puzzle', () => {
       const p = puzzle().payToPublicKey(TEST_PUBKEY);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('mod');
       // The implementation might not use PUBKEY as parameter name
       expect(serialized).toContain('AGG_SIG_ME');
@@ -264,7 +264,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
 
     test('should create delegated puzzle', () => {
       const p = puzzle().delegatedPuzzle();
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('mod');
       // Uses argument positions instead of names
       expect(serialized).toContain('"2"'); // delegated_puzzle is arg 2
@@ -283,7 +283,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
         .createAnnouncement('test');
       
       expect(p).toBeInstanceOf(PuzzleBuilder);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('CREATE_COIN');
       expect(serialized).toContain('RESERVE_FEE');
       expect(serialized).toContain('AGG_SIG_ME');
@@ -299,7 +299,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
         .createCoin('recipient', variable('amount'))
         .reserveFee(10);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       // Note: curried params might not show in serialized form
       expect(serialized).toContain('recipient');
       expect(serialized).toContain('amount');
@@ -309,14 +309,14 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
   describe('Edge Cases', () => {
     test('should handle empty string parameters', () => {
       const p = puzzle().createAnnouncement('');
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('CREATE_COIN_ANNOUNCEMENT');
       expect(serialized).toContain('0x'); // Empty string becomes empty hex
     });
 
     test('should handle zero amounts', () => {
       const p = puzzle().createCoin(TEST_ADDRESS, 0);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('CREATE_COIN');
       expect(serialized).toContain('0');
     });
@@ -324,7 +324,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
     test('should handle bigint amounts', () => {
       const bigAmount = 1000000000000000000n;
       const p = puzzle().createCoin(TEST_ADDRESS, bigAmount);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('CREATE_COIN');
       expect(serialized).toContain('1000000000000000000');
     });
@@ -333,7 +333,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
       const pubkeyBytes = new Uint8Array(48);
       pubkeyBytes.fill(0xaa);
       const p = puzzle().requireSignature(pubkeyBytes);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('AGG_SIG_ME');
       expect(serialized).toContain('aa'.repeat(48));
     });
@@ -345,19 +345,19 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
         .withSolutionParams('conditions')
         .returnConditions();
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('conditions');
     });
 
     test('should return custom value', () => {
       const p = puzzle().returnValue(expr(42));
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('42');
     });
 
     test('should fail with fail()', () => {
       const p = puzzle().fail();
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('x'); // fail operator
     });
   });
@@ -365,7 +365,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
   describe('Include Management', () => {
     test('should auto-include condition codes library', () => {
       const p = puzzle().createCoin(TEST_ADDRESS, TEST_AMOUNT);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('include condition_codes.clib');
     });
 
@@ -374,7 +374,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
         .include('custom.clib')
         .createCoin(TEST_ADDRESS, TEST_AMOUNT);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('include custom.clib');
     });
 
@@ -383,7 +383,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
         .includeStandardLibraries()
         .createCoin(TEST_ADDRESS, TEST_AMOUNT);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('include condition_codes.clib');
     });
   });
@@ -398,7 +398,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
       p.serialize({ indent: true });
       
       // Comments are not preserved in serialization
-      p.serialize();
+      p.toChiaLisp();
     });
 
     test('should add block comments', () => {
@@ -423,7 +423,7 @@ describe('PuzzleBuilder - Basic Functionality (Fixed)', () => {
             b.createCoin(TEST_ADDRESS, 200);
           });
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('i'); // 'i' is the compiled if operator
       expect(serialized).toContain('='); // equals comparison
       expect(serialized).toContain('CREATE_COIN');

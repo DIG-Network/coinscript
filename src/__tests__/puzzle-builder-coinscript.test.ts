@@ -23,7 +23,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       const result = compileCoinScript(code);
       expect(result.mainPuzzle).toBeInstanceOf(PuzzleBuilder);
       
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       expect(serialized).toContain('mod');
       expect(serialized).toContain('CREATE_COIN'); // Uses symbolic name with includes
     });
@@ -49,7 +49,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       const result = compileCoinScript(code);
       expect(result.mainPuzzle).toBeInstanceOf(PuzzleBuilder);
       
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       expect(serialized).toContain('owner');
       expect(serialized).toContain('initialOwner');
     });
@@ -73,7 +73,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       // Should have action dispatch logic
       expect(serialized).toContain('if');
@@ -102,7 +102,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       expect(serialized).toContain('count');
       expect(serialized).toContain('lastUser');
@@ -139,7 +139,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       expect(serialized).toContain('state');
       expect(serialized).toContain('if');
@@ -166,7 +166,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       // Events should create announcements
       expect(serialized).toContain('60'); // CREATE_COIN_ANNOUNCEMENT
@@ -187,7 +187,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       expect(serialized).toContain('60'); // CREATE_COIN_ANNOUNCEMENT
       expect(serialized).toContain('61'); // ASSERT_COIN_ANNOUNCEMENT
@@ -231,7 +231,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       expect(serialized).toContain('admin');
       expect(serialized).toContain('operators');
@@ -260,7 +260,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       expect(serialized).toContain('unlockTime');
       expect(serialized).toContain('80'); // Time assertion
@@ -315,7 +315,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       expect(serialized).toContain('buyer');
       expect(serialized).toContain('seller');
@@ -355,7 +355,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       expect(serialized).toContain('owners');
       expect(serialized).toContain('threshold');
@@ -392,7 +392,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       expect(serialized).toContain('owner');
       expect(serialized).toContain('pendingOwner');
@@ -416,7 +416,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       expect(serialized).toContain('singleton');
     });
@@ -434,7 +434,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       expect(serialized).toContain('66'); // SEND_MESSAGE
     });
@@ -453,7 +453,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       expect(serialized).toContain('assert');
       expect(serialized).toContain('>'); // Greater than
@@ -473,7 +473,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       // Should handle default action
       expect(serialized).toContain('default');
@@ -500,7 +500,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       expect(serialized).toContain('owner');
       expect(serialized).toContain('onlyOwner');
@@ -531,7 +531,7 @@ describe.skip('PuzzleBuilder - CoinScript Compilation', () => {
       `;
       
       const result = compileCoinScript(code);
-      const serialized = result.mainPuzzle.serialize();
+      const serialized = result.mainPuzzle.toChiaLisp();
       
       expect(serialized).toContain('packed');
       expect(serialized).toContain('>>'); // Bit shift
@@ -556,7 +556,7 @@ describe('PuzzleBuilder - CoinScript Integration', () => {
       `;
       
       const result = compileCoinScript(source);
-      const output = result.mainPuzzle.serialize();
+      const output = result.mainPuzzle.toChiaLisp();
       
       // Check that 'enabled' is replaced with 1 (true) in the if statement
       expect(output).toContain('(i 1');
@@ -584,7 +584,7 @@ describe('PuzzleBuilder - CoinScript Integration', () => {
       `;
       
       const result = compileCoinScript(source);
-      const output = result.mainPuzzle.serialize();
+      const output = result.mainPuzzle.toChiaLisp();
       
       // Check that 'paused' (false) is replaced with 0 and negated
       expect(output).toContain('(i (not 0)');
@@ -602,7 +602,7 @@ describe('PuzzleBuilder - CoinScript Integration', () => {
       `;
       
       const result = compileCoinScript(source);
-      const output = result.mainPuzzle.serialize();
+      const output = result.mainPuzzle.toChiaLisp();
       
       // Check that CREATE_COIN is generated
       expect(output).toContain('CREATE_COIN');
@@ -621,7 +621,7 @@ describe('PuzzleBuilder - CoinScript Integration', () => {
       `;
       
       const result = compileCoinScript(source);
-      const output = result.mainPuzzle.serialize();
+      const output = result.mainPuzzle.toChiaLisp();
       
       // Should have CREATE_COIN condition
       expect(output).toContain('CREATE_COIN');
@@ -644,7 +644,7 @@ describe('PuzzleBuilder - CoinScript Integration', () => {
       `;
       
       const result = compileCoinScript(source);
-      const output = result.mainPuzzle.serialize();
+      const output = result.mainPuzzle.toChiaLisp();
       
       // Check AGG_SIG_ME is generated
       expect(output).toContain('AGG_SIG_ME');
@@ -663,7 +663,7 @@ describe('PuzzleBuilder - CoinScript Integration', () => {
       `;
       
       const result = compileCoinScript(source);
-      const output = result.mainPuzzle.serialize();
+      const output = result.mainPuzzle.toChiaLisp();
       
       // Should have if condition but not AGG_SIG_ME
       expect(output).toMatch(/\(i.*\(/); // if statement pattern
@@ -696,7 +696,7 @@ describe('PuzzleBuilder - CoinScript Integration', () => {
       `;
       
       const result = compileCoinScript(source);
-      const output = result.mainPuzzle.serialize();
+      const output = result.mainPuzzle.toChiaLisp();
       
       // Check all components are present
       expect(output).toContain('AGG_SIG_ME');
@@ -721,7 +721,7 @@ describe('PuzzleBuilder - CoinScript Integration', () => {
       `;
       
       const result = compileCoinScript(source);
-      const output = result.mainPuzzle.serialize();
+      const output = result.mainPuzzle.toChiaLisp();
       
       // Check announcement is created
       expect(output).toContain('CREATE_COIN_ANNOUNCEMENT');

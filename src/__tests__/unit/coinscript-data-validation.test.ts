@@ -16,7 +16,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      const chialisp = result.mainPuzzle.serialize({ format: 'chialisp' });
+      const chialisp = result.mainPuzzle.toChiaLisp();
       
       // Check that addresses were converted to hex
       expect(chialisp).toContain('0x325510b63fe36e7c5ed0474d8869b6be1c14ede866ab77a8051ec9adb9c13bbc');
@@ -36,7 +36,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      const chialisp = result.mainPuzzle.serialize({ format: 'chialisp' });
+      const chialisp = result.mainPuzzle.toChiaLisp();
       
       // Should contain the converted hex (note: this is a made-up address)
       expect(chialisp).toContain('0x');
@@ -54,7 +54,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      const chialisp = result.mainPuzzle.serialize({ format: 'chialisp' });
+      const chialisp = result.mainPuzzle.toChiaLisp();
       
       expect(chialisp).toContain('0x1234567890123456789012345678901234567890123456789012345678901234');
     });
@@ -87,7 +87,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      const chialisp = result.mainPuzzle.serialize({ format: 'chialisp' });
+      const chialisp = result.mainPuzzle.toChiaLisp();
       
       // Should have both addresses converted
       expect(chialisp).toContain('0x325510b63fe36e7c5ed0474d8869b6be1c14ede866ab77a8051ec9adb9c13bbc');
@@ -112,7 +112,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      const chialisp = result.mainPuzzle.serialize({ format: 'chialisp' });
+      const chialisp = result.mainPuzzle.toChiaLisp();
       
       // Storage values are only included when actually used
       expect(chialisp).toContain('500'); // The amount actually used
@@ -130,7 +130,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      const chialisp = result.mainPuzzle.serialize({ format: 'chialisp' });
+      const chialisp = result.mainPuzzle.toChiaLisp();
       
       expect(chialisp).toContain('0');
     });
@@ -153,7 +153,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      expect(() => result.mainPuzzle.serialize({ format: 'chialisp' })).not.toThrow();
+      expect(() => result.mainPuzzle.toChiaLisp()).not.toThrow();
     });
   });
   
@@ -172,7 +172,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      const chialisp = result.mainPuzzle.serialize({ format: 'chialisp' });
+      const chialisp = result.mainPuzzle.toChiaLisp();
       
       // In ChiaLisp, true is 1 and false is 0
       expect(chialisp).toMatch(/1/); // true becomes 1
@@ -193,7 +193,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      expect(() => result.mainPuzzle.serialize({ format: 'chialisp' })).not.toThrow();
+      expect(() => result.mainPuzzle.toChiaLisp()).not.toThrow();
     });
   });
   
@@ -211,7 +211,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      const chialisp = result.mainPuzzle.serialize({ format: 'chialisp' });
+      const chialisp = result.mainPuzzle.toChiaLisp();
       
       // String comparison is generated in the output
       expect(chialisp).toContain('"TestCoin"');
@@ -230,7 +230,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      const chialisp = result.mainPuzzle.serialize({ format: 'chialisp' });
+      const chialisp = result.mainPuzzle.toChiaLisp();
       
       expect(chialisp).toContain('""');
     });
@@ -251,7 +251,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      const chialisp = result.mainPuzzle.serialize({ format: 'chialisp' });
+      const chialisp = result.mainPuzzle.toChiaLisp();
       
       // Since storage values are used in comparisons, they should appear
       expect(chialisp.toLowerCase()).toMatch(/1234567890abcdef/);
@@ -292,7 +292,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      const chialisp = result.mainPuzzle.serialize({ format: 'chialisp' });
+      const chialisp = result.mainPuzzle.toChiaLisp();
       
       // Check that defaults are applied
       expect(chialisp).toBeDefined();
@@ -313,7 +313,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      const chialisp = result.mainPuzzle.serialize({ format: 'chialisp' });
+      const chialisp = result.mainPuzzle.toChiaLisp();
       
       // Should generate AGG_SIG_ME condition
       expect(chialisp).toContain('AGG_SIG_ME');
@@ -331,7 +331,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      const chialisp = result.mainPuzzle.serialize({ format: 'chialisp' });
+      const chialisp = result.mainPuzzle.toChiaLisp();
       
       // Should have CREATE_COIN with recipient parameter
       expect(chialisp).toContain('CREATE_COIN');
@@ -357,7 +357,7 @@ describe('CoinScript Data Type Validation', () => {
       `;
       
       const result = compileCoinScript(source);
-      const chialisp = result.mainPuzzle.serialize({ format: 'chialisp' });
+      const chialisp = result.mainPuzzle.toChiaLisp();
       
       // Check conversions that are actually used in the action
       expect(chialisp).toContain('0x325510b63fe36e7c5ed0474d8869b6be1c14ede866ab77a8051ec9adb9c13bbc'); // owner address

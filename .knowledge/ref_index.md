@@ -158,16 +158,24 @@ This index provides a comprehensive guide to all reference documentation in the 
 
 ### 12. Layers Module API
 - **File**: `./.knowledge/reference/layers-module-api.md`
-- **Description**: API reference for all puzzle layers
-- **Key Concepts**:
-  - Singleton layer for uniqueness
-  - State layer for persistence
-  - Ownership layer for NFTs
+- **Description**: Complete API documentation for all layer modules
+- **Key Concepts**: 
+  - Layer interfaces and options
+  - Singleton, state, ownership, royalty layers
   - Layer composition patterns
-- **When to Consult**:
-  - Creating NFTs or DIDs
-  - Adding state to puzzles
-  - Composing multiple layers
+  - Usage examples for each layer
+- **When to Consult**: When implementing or using layers in CoinScript
+
+### 13. Chia Smart Coins Guide
+- **File**: `./.knowledge/reference/chia-smart-coins-guide.md`
+- **Description**: Comprehensive guide to Chia smart coins from official documentation
+- **Key Concepts**:
+  - Smart coin fundamentals and puzzles
+  - Password example with currying and hashing
+  - Creating and spending coins
+  - Security concerns and best practices
+  - Common commands and tools
+- **When to Consult**: When learning Chia fundamentals or implementing puzzles
 
 ## Usage Guidelines
 

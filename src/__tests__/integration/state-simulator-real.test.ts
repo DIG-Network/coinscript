@@ -19,7 +19,7 @@ import {
 import * as bip39 from 'bip39';
 import { mnemonicToSeedSync } from 'bip39';
 import { PrivateKey } from 'chia-bls';
-import { createSolution } from '../../builder/SolutionBuilder';
+import { SolutionBuilder } from '../../builder/SolutionBuilder';
 import { serialize } from '../../core/serializer';
 import { Program } from 'clvm-lib';
 import { compileCoinScript } from '../../coinscript';
@@ -127,8 +127,17 @@ describe('CoinScript State Management with Real Chia Simulator', () => {
       // Compile the contract
       console.log('🔧 Compiling CoinScript contract...');
       const compiled = compileCoinScript(contractSource);
+      
+      // Debug output
+      console.log('📦 Compilation result:', {
+        mainPuzzle: typeof compiled.mainPuzzle,
+        hasMethod: compiled.mainPuzzle && typeof compiled.mainPuzzle.toPuzzleReveal === 'function',
+        keys: compiled.mainPuzzle ? Object.keys(compiled.mainPuzzle) : [],
+        proto: compiled.mainPuzzle ? Object.getPrototypeOf(compiled.mainPuzzle) : null
+      });
+      
       const puzzleReveal = Buffer.from(
-        compiled.mainPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        compiled.mainPuzzle.toPuzzleReveal(), 
         'hex'
       );
       const puzzleHash = compiled.mainPuzzle.toModHash();
@@ -148,7 +157,7 @@ describe('CoinScript State Management with Real Chia Simulator', () => {
         totalValue: Number(initialAmount)
       };
       
-      const solution = createSolution()
+      const solution = new SolutionBuilder()
         .addAction('increment')
         .addState(currentState)
         .build();
@@ -211,7 +220,7 @@ describe('CoinScript State Management with Real Chia Simulator', () => {
       
       const compiled = compileCoinScript(contractSource);
       const puzzleReveal = Buffer.from(
-        compiled.mainPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        compiled.mainPuzzle.toPuzzleReveal(), 
         'hex'
       );
       const puzzleHash = compiled.mainPuzzle.toModHash();
@@ -230,7 +239,7 @@ describe('CoinScript State Management with Real Chia Simulator', () => {
           totalValue: 1000
         };
         
-        const solution = createSolution()
+        const solution = new SolutionBuilder()
           .addAction('increment')
           .addState(currentState)
           .build();
@@ -308,7 +317,7 @@ describe('CoinScript State Management with Real Chia Simulator', () => {
       
       const compiled = compileCoinScript(contractSource);
       const puzzleReveal = Buffer.from(
-        compiled.mainPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        compiled.mainPuzzle.toPuzzleReveal(), 
         'hex'
       );
       const puzzleHash = compiled.mainPuzzle.toModHash();
@@ -328,7 +337,7 @@ describe('CoinScript State Management with Real Chia Simulator', () => {
         lastTransferTime: 0
       };
       
-      const solution = createSolution()
+      const solution = new SolutionBuilder()
         .addAction('transfer', [recipientAddress, Number(transferAmount)])
         .addState(currentState)
         .build();
@@ -415,7 +424,7 @@ describe('CoinScript State Management with Real Chia Simulator', () => {
       
       const compiled = compileCoinScript(contractSource);
       const puzzleReveal = Buffer.from(
-        compiled.mainPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        compiled.mainPuzzle.toPuzzleReveal(), 
         'hex'
       );
       const puzzleHash = compiled.mainPuzzle.toModHash();
@@ -433,7 +442,7 @@ describe('CoinScript State Management with Real Chia Simulator', () => {
       console.log(`📊 Initial state: ${initialState.status}`);
       
       // Start auction
-      const solution = createSolution()
+      const solution = new SolutionBuilder()
         .addAction('startAuction', [3600]) // 1 hour duration
         .addState(initialState)
         .build();
@@ -509,7 +518,7 @@ describe('CoinScript State Management with Real Chia Simulator', () => {
       
       const compiled = compileCoinScript(contractSource);
       const puzzleReveal = Buffer.from(
-        compiled.mainPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        compiled.mainPuzzle.toPuzzleReveal(), 
         'hex'
       );
       const puzzleHash = compiled.mainPuzzle.toModHash();
@@ -517,7 +526,7 @@ describe('CoinScript State Management with Real Chia Simulator', () => {
       const coin = await peer.simulatorNewCoin(Buffer.from(puzzleHash.slice(2), 'hex'), 10000n);
       
       // Try to withdraw with unauthorized key
-      const solution = createSolution()
+      const solution = new SolutionBuilder()
         .addAction('withdraw', [1000])
         .addState({
           balance: 10000,
@@ -589,7 +598,7 @@ describe('CoinScript State Management with Real Chia Simulator', () => {
       
       const compiled = compileCoinScript(contractSource);
       const puzzleReveal = Buffer.from(
-        compiled.mainPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        compiled.mainPuzzle.toPuzzleReveal(), 
         'hex'
       );
       const puzzleHash = compiled.mainPuzzle.toModHash();
@@ -617,7 +626,7 @@ describe('CoinScript State Management with Real Chia Simulator', () => {
       };
       
       for (const event of events) {
-        const solution = createSolution()
+        const solution = new SolutionBuilder()
           .addAction('recordEvent', [event.type, event.value])
           .addState(runningState)
           .build();
@@ -702,7 +711,7 @@ describe('CoinScript State Management with Real Chia Simulator', () => {
       
       const compiled = compileCoinScript(contractSource);
       const puzzleReveal = Buffer.from(
-        compiled.mainPuzzle.serialize({ format: 'hex', compiled: true }).slice(2), 
+        compiled.mainPuzzle.toPuzzleReveal(), 
         'hex'
       );
       const puzzleHash = compiled.mainPuzzle.toModHash();
@@ -715,7 +724,7 @@ describe('CoinScript State Management with Real Chia Simulator', () => {
       for (let i = 0; i < updateCount; i++) {
         const coin = await peer.simulatorNewCoin(Buffer.from(puzzleHash.slice(2), 'hex'), 100n);
         
-        const solution = createSolution()
+        const solution = new SolutionBuilder()
           .addAction('update', [i])
           .addState({
             counter: i - 1,

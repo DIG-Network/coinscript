@@ -222,7 +222,7 @@ describe('PuzzleBuilder - AST Operations (Fixed)', () => {
             b.fail();
           });
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('i'); // Compiled if operator
       expect(serialized).toContain('>');
       expect(serialized).toContain('CREATE_COIN');
@@ -246,7 +246,7 @@ describe('PuzzleBuilder - AST Operations (Fixed)', () => {
             b.returnValue(expr('x not positive'));
           });
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       // Uses 'i' instead of 'if'
       expect(serialized.match(/i/g)?.length).toBeGreaterThan(1);
       // Strings are encoded
@@ -261,7 +261,7 @@ describe('PuzzleBuilder - AST Operations (Fixed)', () => {
         .createCoin('0x' + '2'.repeat(64), 200)
         .createCoin('0x' + '3'.repeat(64), 300);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized.match(/CREATE_COIN/g)?.length).toBe(3);
     });
 
@@ -277,7 +277,7 @@ describe('PuzzleBuilder - AST Operations (Fixed)', () => {
             b.fail();
           });
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('amount');
       expect(serialized).toContain('recipient');
       expect(serialized).toContain('>');
@@ -302,7 +302,7 @@ describe('PuzzleBuilder - AST Operations (Fixed)', () => {
             b.fail();
           });
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       // Note: curried params might not show in serialized form
       expect(serialized).toContain('action');
       expect(serialized).toContain('data');
@@ -316,7 +316,7 @@ describe('PuzzleBuilder - AST Operations (Fixed)', () => {
       // Access private property through type assertion
       (p as any).addNode(rawList);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       // When noMod is used and raw nodes added, numeric opcodes stay numeric
       expect(serialized).toContain('51');
       expect(serialized).toContain('0x' + 'a'.repeat(64));
@@ -327,7 +327,7 @@ describe('PuzzleBuilder - AST Operations (Fixed)', () => {
       const p = puzzle().noMod();
       (p as any).addNode(nil);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('()'); // nil serializes as ()
     });
 
@@ -336,7 +336,7 @@ describe('PuzzleBuilder - AST Operations (Fixed)', () => {
       const p = puzzle().noMod();
       (p as any).addNode(consExpr);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       // cons serializes with dot notation
       expect(serialized).toContain('1');
       expect(serialized).toContain('2');
@@ -347,7 +347,7 @@ describe('PuzzleBuilder - AST Operations (Fixed)', () => {
   describe('AST Serialization', () => {
     test('should serialize simple AST correctly', () => {
       const p = puzzle().noMod().createCoin('0x' + 'a'.repeat(64), 100);
-      const compact = p.serialize();
+      const compact = p.toChiaLisp();
       const indented = p.serialize({ indent: true });
       
       expect(compact).not.toContain('\n');

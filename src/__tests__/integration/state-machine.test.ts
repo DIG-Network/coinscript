@@ -1,6 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
 import { compileCoinScript } from '../../coinscript';
-import { createSolution } from '../../index';
+import { SolutionBuilder } from '../../builder/SolutionBuilder';
 import { serialize } from '../../core';
 
 describe('State Machine Implementation', () => {
@@ -36,8 +36,8 @@ describe('State Machine Implementation', () => {
 
       const result = compileCoinScript(source);
       
-      expect(result.mainPuzzle.serialize()).toContain('increment');
-      expect(result.mainPuzzle.serialize()).toContain('decrement');
+      expect(result.mainPuzzle.toChiaLisp()).toContain('increment');
+      expect(result.mainPuzzle.toChiaLisp()).toContain('decrement');
       expect(result.additionalPuzzles).toBeDefined();
       expect(Object.keys(result.additionalPuzzles!)).toContain('increment');
       expect(Object.keys(result.additionalPuzzles!)).toContain('decrement');
@@ -92,7 +92,7 @@ describe('State Machine Implementation', () => {
 
       const result = compileCoinScript(source);
       
-      expect(result.mainPuzzle.serialize()).toBeDefined();
+      expect(result.mainPuzzle.toChiaLisp()).toBeDefined();
       expect(result.additionalPuzzles).toBeDefined();
       expect(Object.keys(result.additionalPuzzles!)).toHaveLength(3);
     });
@@ -165,11 +165,11 @@ describe('State Machine Implementation', () => {
 
       const result = compileCoinScript(source);
       
-      expect(result.mainPuzzle.serialize()).toContain('activate');
-      expect(result.mainPuzzle.serialize()).toContain('startProcessing');
-      expect(result.mainPuzzle.serialize()).toContain('processItem');
-      expect(result.mainPuzzle.serialize()).toContain('handleError');
-      expect(result.mainPuzzle.serialize()).toContain('reset');
+      expect(result.mainPuzzle.toChiaLisp()).toContain('activate');
+      expect(result.mainPuzzle.toChiaLisp()).toContain('startProcessing');
+      expect(result.mainPuzzle.toChiaLisp()).toContain('processItem');
+      expect(result.mainPuzzle.toChiaLisp()).toContain('handleError');
+      expect(result.mainPuzzle.toChiaLisp()).toContain('reset');
       expect(result.additionalPuzzles).toBeDefined();
       expect(Object.keys(result.additionalPuzzles!)).toHaveLength(5);
     });
@@ -205,7 +205,7 @@ describe('State Machine Implementation', () => {
 
       const result = compileCoinScript(source);
       
-      expect(result.mainPuzzle.serialize()).toBeDefined();
+      expect(result.mainPuzzle.toChiaLisp()).toBeDefined();
       expect(result.additionalPuzzles?.updateBalance).toBeDefined();
     });
   });
@@ -243,7 +243,7 @@ describe('State Machine Implementation', () => {
 
       const result = compileCoinScript(source);
       
-      expect(result.mainPuzzle.serialize()).toContain('CREATE_COIN_ANNOUNCEMENT');
+      expect(result.mainPuzzle.toChiaLisp()).toContain('CREATE_COIN_ANNOUNCEMENT');
       expect(result.additionalPuzzles).toBeDefined();
     });
   });
@@ -296,7 +296,7 @@ describe('State Machine Implementation', () => {
 
       const result = compileCoinScript(source);
       
-      expect(result.mainPuzzle.serialize()).toBeDefined();
+      expect(result.mainPuzzle.toChiaLisp()).toBeDefined();
       expect(result.additionalPuzzles).toBeDefined();
       expect(Object.keys(result.additionalPuzzles!)).toHaveLength(4);
     });
@@ -338,7 +338,7 @@ describe('State Machine Implementation', () => {
 
       const result = compileCoinScript(source);
       
-      expect(result.mainPuzzle.serialize()).toBeDefined();
+      expect(result.mainPuzzle.toChiaLisp()).toBeDefined();
       expect(result.additionalPuzzles).toBeDefined();
     });
   });
@@ -350,7 +350,7 @@ describe('State Machine Implementation', () => {
         lastUpdater: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       };
 
-      const solution = createSolution()
+      const solution = new SolutionBuilder()
         .addAction('increment')
         .addState(currentState)
         .build();
@@ -376,7 +376,7 @@ describe('State Machine Implementation', () => {
         configFeeRecipient: '0xcccc'
       };
 
-      const solution = createSolution()
+      const solution = new SolutionBuilder()
         .addAction('mint', ['0xdddd', 500])
         .addState(complexState)
         .build();
@@ -408,7 +408,7 @@ describe('State Machine Implementation', () => {
 
       const result = compileCoinScript(source);
       
-      expect(result.mainPuzzle.serialize()).toBeDefined();
+      expect(result.mainPuzzle.toChiaLisp()).toBeDefined();
       expect(result.additionalPuzzles?.upgrade).toBeDefined();
       // Should contain logic to recreate the coin with same puzzle hash
     });
@@ -443,7 +443,7 @@ describe('State Machine Implementation', () => {
 
       const result = compileCoinScript(source);
       
-      expect(result.mainPuzzle.serialize()).toBeDefined();
+      expect(result.mainPuzzle.toChiaLisp()).toBeDefined();
       expect(result.additionalPuzzles).toBeDefined();
     });
   });
@@ -503,7 +503,7 @@ describe('State Machine Implementation', () => {
 
       const result = compileCoinScript(source);
       
-      expect(result.mainPuzzle.serialize()).toBeDefined();
+      expect(result.mainPuzzle.toChiaLisp()).toBeDefined();
       expect(result.additionalPuzzles).toBeDefined();
     });
   });

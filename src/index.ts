@@ -17,10 +17,6 @@ export {
   arg1,
   arg2,
   arg3,
-  // Removed 'solution' to avoid conflict with SolutionBuilder's createSolution
-  // Export solution builder factories
-  createSolution,
-  createConditions,
   SolutionBuilder,
   ConditionListBuilder
 } from './builder';
@@ -28,28 +24,11 @@ export {
 // Export layer system
 export * from './layers';
 
-// Export CoinScript compiler
-export { compileCoinScript, parseCoinScriptFile } from './coinscript';
-
 // Export runtime support
 export * from './runtime';
 
-// === SIMPLIFIED API ===
-import { PuzzleBuilder } from './builder';
-
-/**
- * Create a new puzzle using the builder API
- * 
- * @example
- * ```typescript
- * const puzzle = createPuzzle()
- *   .payToPublicKey(pubkey)
- *   .build();
- * ```
- */
-export function createPuzzle(): PuzzleBuilder {
-  return new PuzzleBuilder();
-}
+// Export CoinScript
+export * from './coinscript';
 
 // === CORE EXPORTS (for advanced use) ===
 

@@ -31,8 +31,8 @@ describe('PuzzleBuilder - Include Files Round-trip', () => {
       fs.writeFileSync(tempFile, testMod);
       
       try {
-        const loaded = PuzzleBuilder.fromClsp(tempFile);
-        const serialized = loaded.serialize();
+        const loaded = PuzzleBuilder.fromChiaLisp(tempFile);
+        const serialized = loaded.toChiaLisp();
         
         // Verify the include is present
         expect(serialized).toContain('(include condition_codes.clib)');
@@ -91,8 +91,8 @@ describe('PuzzleBuilder - Include Files Round-trip', () => {
       fs.writeFileSync(tempFile, testMod);
       
       try {
-        const loaded = PuzzleBuilder.fromClsp(tempFile);
-        const serialized = loaded.serialize();
+        const loaded = PuzzleBuilder.fromChiaLisp(tempFile);
+        const serialized = loaded.toChiaLisp();
         
         // Verify the include is present
         expect(serialized).toContain('(include utility_macros.clib)');
@@ -132,8 +132,8 @@ describe('PuzzleBuilder - Include Files Round-trip', () => {
       fs.writeFileSync(tempFile, testMod);
       
       try {
-        const loaded = PuzzleBuilder.fromClsp(tempFile);
-        const serialized = loaded.serialize();
+        const loaded = PuzzleBuilder.fromChiaLisp(tempFile);
+        const serialized = loaded.toChiaLisp();
         
         expect(serialized).toContain('(include utility_macros.clib)');
         expect(serialized).toContain('or');
@@ -154,8 +154,8 @@ describe('PuzzleBuilder - Include Files Round-trip', () => {
       fs.writeFileSync(tempFile, testMod);
       
       try {
-        const loaded = PuzzleBuilder.fromClsp(tempFile);
-        const serialized = loaded.serialize();
+        const loaded = PuzzleBuilder.fromChiaLisp(tempFile);
+        const serialized = loaded.toChiaLisp();
         
         expect(serialized).toContain('(include curry-and-treehash.clinc)');
         expect(serialized).toContain('puzzle-hash-of-curried-function');
@@ -202,8 +202,8 @@ describe('PuzzleBuilder - Include Files Round-trip', () => {
       fs.writeFileSync(tempFile, testMod);
       
       try {
-        const loaded = PuzzleBuilder.fromClsp(tempFile);
-        const serialized = loaded.serialize();
+        const loaded = PuzzleBuilder.fromChiaLisp(tempFile);
+        const serialized = loaded.toChiaLisp();
         
         expect(serialized).toContain('(include singleton_truths.clib)');
         expect(serialized).toContain('my_id_truth');
@@ -252,8 +252,8 @@ describe('PuzzleBuilder - Include Files Round-trip', () => {
       fs.writeFileSync(tempFile, testMod);
       
       try {
-        const loaded = PuzzleBuilder.fromClsp(tempFile);
-        const serialized = loaded.serialize();
+        const loaded = PuzzleBuilder.fromChiaLisp(tempFile);
+        const serialized = loaded.toChiaLisp();
         
         expect(serialized).toContain('(include cat_truths.clib)');
         expect(serialized).toContain('my_inner_puzzle_hash_cat_truth');
@@ -299,8 +299,8 @@ describe('PuzzleBuilder - Include Files Round-trip', () => {
       fs.writeFileSync(tempFile, testMod);
       
       try {
-        const loaded = PuzzleBuilder.fromClsp(tempFile);
-        const serialized = loaded.serialize();
+        const loaded = PuzzleBuilder.fromChiaLisp(tempFile);
+        const serialized = loaded.toChiaLisp();
         
         expect(serialized).toContain('(include sha256tree.clib)');
         expect(serialized).toContain('sha256tree');
@@ -327,8 +327,8 @@ describe('PuzzleBuilder - Include Files Round-trip', () => {
       fs.writeFileSync(tempFile, testMod);
       
       try {
-        const loaded = PuzzleBuilder.fromClsp(tempFile);
-        const serialized = loaded.serialize();
+        const loaded = PuzzleBuilder.fromChiaLisp(tempFile);
+        const serialized = loaded.toChiaLisp();
         
         // Verify all includes are present in order
         const conditionIndex = serialized.indexOf('(include condition_codes.clib)');
@@ -364,8 +364,8 @@ describe('PuzzleBuilder - Include Files Round-trip', () => {
       fs.writeFileSync(tempFile, testMod);
       
       try {
-        const loaded = PuzzleBuilder.fromClsp(tempFile);
-        const serialized = loaded.serialize();
+        const loaded = PuzzleBuilder.fromChiaLisp(tempFile);
+        const serialized = loaded.toChiaLisp();
         
         // Verify includes are in the right order
         const curryIndex = serialized.indexOf('(include curry-and-treehash.clinc)');
@@ -393,7 +393,7 @@ describe('PuzzleBuilder - Include Files Round-trip', () => {
       fs.writeFileSync(tempFile, testMod);
       
       try {
-        const loaded = PuzzleBuilder.fromClsp(tempFile);
+        const loaded = PuzzleBuilder.fromChiaLisp(tempFile);
         const ast = loaded.build();
         
         // Verify AST structure
@@ -435,8 +435,8 @@ describe('PuzzleBuilder - Include Files Round-trip', () => {
       fs.writeFileSync(tempFile, testMod);
       
       try {
-        const loaded = PuzzleBuilder.fromClsp(tempFile);
-        const serialized = loaded.serialize();
+        const loaded = PuzzleBuilder.fromChiaLisp(tempFile);
+        const serialized = loaded.toChiaLisp();
         
         // The macro should be preserved in the output
         expect(serialized).toContain('assert');

@@ -12,16 +12,11 @@ import {
   PeerType, 
   Tls
 } from '@dignetwork/datalayer-driver';
-import * as bip39 from 'bip39';
-import { mnemonicToSeedSync } from 'bip39';
-import { PrivateKey } from 'chia-bls';
 import { Program } from 'clvm-lib';
 
 describe('State Management Demo with Chia Simulator', () => {
   let peer: Peer;
   let tls: Tls;
-  let masterSecretKey: Buffer;
-
 
   beforeAll(async () => {
     // Initialize TLS and Peer - use default certificates if available
@@ -48,12 +43,8 @@ describe('State Management Demo with Chia Simulator', () => {
       return;
     }
 
-    // Generate test keys
-    const mnemonic = bip39.generateMnemonic(256);
-    const seed = mnemonicToSeedSync(mnemonic);
-    masterSecretKey = Buffer.from(PrivateKey.fromSeed(seed).toHex(), "hex");
-
-    console.log(`🔑 Keys generated successfully`);
+    // Generate test keys (not needed for this demo, skipping)
+    console.log(`🔑 Simulator connected, ready for demo`);
   });
 
   afterAll(async () => {

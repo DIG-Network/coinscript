@@ -5,7 +5,7 @@
  * system works across blocks, showing state persistence, transitions, and validation.
  */
 
-import { createSolution } from '../../builder/SolutionBuilder';
+import { SolutionBuilder } from '../../builder/SolutionBuilder';
 import { compileCoinScript } from '../../coinscript';
 import { serialize } from '../../core/serializer';
 
@@ -86,7 +86,7 @@ describe('State Management System Demonstration', () => {
       console.log(`  State: ${JSON.stringify(initialState, null, 2)}`);
       
       // Create solution for increment action
-      const solution1 = createSolution()
+      const solution1 = new SolutionBuilder()
         .addAction('increment')
         .addState(initialState)
         .build();
@@ -106,7 +106,7 @@ describe('State Management System Demonstration', () => {
       console.log(`  State: ${JSON.stringify(stateAfterIncrement, null, 2)}`);
       
       // Create solution for setValue action
-      createSolution()
+      new SolutionBuilder()
         .addAction('setValue', [42])
         .addState(stateAfterIncrement)
         .build();
@@ -125,7 +125,7 @@ describe('State Management System Demonstration', () => {
       console.log(`  State: ${JSON.stringify(stateAfterSetValue, null, 2)}`);
       
       // Create solution for reset action
-      createSolution()
+      new SolutionBuilder()
         .addAction('reset')
         .addState(stateAfterSetValue)
         .build();

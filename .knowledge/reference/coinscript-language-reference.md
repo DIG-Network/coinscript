@@ -170,11 +170,7 @@ action adminFunction() {
   // Only specified addresses can call
 }
 
-@inner_puzzle
-action delegated_spend(conditions: list) {
-  // Validates delegated conditions
-  return conditions
-}
+
 ```
 
 ### View Functions
@@ -379,8 +375,7 @@ For singleton coins, creates the launcher
 ### Action Puzzles
 For `@stateful` actions in state management layer
 
-### Inner Puzzles
-For `@inner_puzzle` decorated actions
+
 
 ## Complete Examples
 

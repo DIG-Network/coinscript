@@ -34,10 +34,10 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       const clsp = `(mod () 42)`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
       expect(p).toBeInstanceOf(PuzzleBuilder);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('mod');
       expect(serialized).toContain('42');
     });
@@ -48,8 +48,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('amount');
       expect(serialized).toContain('recipient');
       expect(serialized).toContain('51');
@@ -62,8 +62,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('include condition_codes.clib');
       expect(serialized).toContain('AGG_SIG_ME');
       expect(serialized).toContain('pubkey');
@@ -83,8 +83,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('x');
       expect(serialized).toContain('y');
       expect(serialized).toContain('>');
@@ -99,8 +99,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('value');
       expect(serialized).toContain('double');
       expect(serialized).toContain('*');
@@ -117,8 +117,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized.match(/51/g)?.length).toBeGreaterThanOrEqual(2);
       expect(serialized).toContain('52');
       expect(serialized).toContain('/');
@@ -130,8 +130,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       const clsp = `(mod conditions conditions)`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('mod');
       expect(serialized).toContain('conditions');
     });
@@ -151,8 +151,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       // Variable names might be converted to hex
       expect(serialized).toContain('singleton_truths.clib');
       expect(serialized).toContain('CREATE_COIN');
@@ -173,8 +173,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       // Variable names might be converted to hex
       expect(serialized).toContain('cat_truths.clib');
       expect(serialized).toContain('CREATE_COIN');
@@ -195,8 +195,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('assert');
     });
 
@@ -212,8 +212,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('MIN_FEE');
       expect(serialized).toContain('MAX_AMOUNT');
     });
@@ -226,8 +226,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       
       // This might throw or return a puzzle with the invalid operator
       expect(() => {
-        const p = PuzzleBuilder.fromClsp(tempPath);
-        p.serialize();
+        const p = PuzzleBuilder.fromChiaLisp(tempPath);
+        p.toChiaLisp();
       }).not.toThrow(); // Should handle gracefully
     });
 
@@ -236,7 +236,7 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       const tempPath = createTempClsp(clsp);
       
       expect(() => {
-        PuzzleBuilder.fromClsp(tempPath);
+        PuzzleBuilder.fromChiaLisp(tempPath);
       }).toThrow(); // Parser should throw on syntax errors
     });
   });
@@ -248,8 +248,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('q');
     });
 
@@ -259,8 +259,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('value');
     });
   });
@@ -278,8 +278,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('+');
       expect(serialized).toContain('-');
       expect(serialized).toContain('*');
@@ -299,8 +299,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('>');
       expect(serialized).toContain('<');
       expect(serialized).toContain('=');
@@ -319,8 +319,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('f');
       expect(serialized).toContain('r');
       expect(serialized).toContain('c');
@@ -337,8 +337,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('sha256');
       expect(serialized).toContain('sha256tree1');
       expect(serialized).toContain('point_add');
@@ -368,8 +368,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       // Variable names might be converted to hex values
       expect(serialized).toContain('AGG_SIG_ME');
       expect(serialized).toContain('ASSERT_HEIGHT_ABSOLUTE');
@@ -390,8 +390,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       // Variable names might be converted to hex values
       expect(serialized).toContain('condition_codes.clib');
       expect(serialized).toContain('AGG_SIG_ME');
@@ -403,7 +403,7 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       const clsp = `(mod () (+ 1 2))`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
       const tree = p.build();
       
       // Should be a mod structure
@@ -419,8 +419,8 @@ describe('PuzzleBuilder - ChiaLisp Parsing', () => {
       )`;
       const tempPath = createTempClsp(clsp);
       
-      const p = PuzzleBuilder.fromClsp(tempPath);
-      const serialized = p.serialize();
+      const p = PuzzleBuilder.fromChiaLisp(tempPath);
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('list');
       expect(serialized).toContain('1');
       expect(serialized).toContain('2');

@@ -39,7 +39,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
       const singleton = withSingletonLayer(owned, '0x' + '1'.repeat(64));
       
       expect(singleton).toBeInstanceOf(PuzzleBuilder);
-      const serialized = singleton.serialize();
+      const serialized = singleton.toChiaLisp();
       expect(serialized).toBeDefined();
     });
 
@@ -100,7 +100,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
             b1.fail();
           });
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('a');
       expect(serialized).toContain('b');
       expect(serialized).toContain('c');
@@ -121,7 +121,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
             b.fail();
           });
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('all'); // and operator
     });
   });
@@ -149,7 +149,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
             b.createCoin(TEST_ADDRESS, expr('@')); // Use literal address
           });
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('action');
       expect(serialized).toContain('ASSERT_SECONDS_RELATIVE');
       expect(serialized).toContain('AGG_SIG_ME');
@@ -183,7 +183,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
               });
           });
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized.match(/=/g)?.length).toBeGreaterThanOrEqual(2);
     });
 
@@ -200,7 +200,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
         .assertAnnouncement('0x' + 'f'.repeat(64)) // Use literal announcement ID
         .createCoin(TEST_ADDRESS, 0); // Use literal address
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('CREATE_COIN');
       expect(serialized).toContain('ASSERT_COIN_ANNOUNCEMENT');
     });
@@ -209,7 +209,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
   describe('Error Handling and Edge Cases', () => {
     test('should handle empty puzzles', () => {
       const p = puzzle();
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('mod');
       expect(serialized).toContain('()'); // Empty body
     });
@@ -219,7 +219,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
         .comment('This puzzle does nothing')
         .blockComment('Really, nothing at all');
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('mod');
       expect(serialized).toContain('()');
     });
@@ -228,7 +228,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
       const params = Array.from({ length: 20 }, (_, i) => `param${i}`);
       const p = puzzle().withSolutionParams(...params);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       params.forEach(param => {
         expect(serialized).toContain(param);
       });
@@ -244,7 +244,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
         .withSolutionParams('x')
         .returnValue(expr);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('x');
       expect(serialized).toContain('+');
       expect(serialized).toContain('*');
@@ -259,7 +259,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
         .returnValue(puzzle().param('A'));
       
       // Should not crash
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toBeDefined();
     });
   });
@@ -273,7 +273,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
         p.createCoin('0x' + i.toString(16).padStart(64, '0'), i);
       }
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       // Count CREATE_COIN outside of defconstant statements
       // The include file has defconstant CREATE_COIN which adds extra matches
       const createCoinMatches = serialized.match(/CREATE_COIN/g)?.length || 0;
@@ -288,7 +288,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
         .includeStandardLibraries()
         .createCoin(TEST_ADDRESS, 100);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('include lib1.clib');
       expect(serialized).toContain('include lib2.clib');
       expect(serialized).toContain('include lib3.clib');
@@ -320,7 +320,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
             b.createCoin('0x' + '1'.repeat(64), 100); // Use literal values
           });
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('sha256');
       expect(serialized).toContain('all'); // and operator for both conditions
     });
@@ -352,7 +352,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
             b.createAnnouncement('nonce_value'); // Use literal string
           });
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('close_flag');
       expect(serialized).toContain('AGG_SIG_ME');
     });
@@ -362,7 +362,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
     test('should serialize with different formats', () => {
       const p = puzzle().createCoin(TEST_ADDRESS, 100);
       
-      const compact = p.serialize();
+      const compact = p.toChiaLisp();
       const indented = p.serialize({ indent: true });
       
       expect(compact.length).toBeLessThan(indented.length);
@@ -376,7 +376,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
         .createCoin(TEST_ADDRESS, 100);
       
       // Test different formats
-      const chialisp = p.serialize({ format: 'chialisp' });
+      const chialisp = p.toChiaLisp();
       expect(chialisp).toContain('mod');
       
       const modHash = p.toModHash();
@@ -391,7 +391,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
           b.createCoin(TEST_ADDRESS, (i + 1) * 100);
         });
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized.match(/CREATE_COIN/g)?.length).toBe(3);
       expect(serialized).toContain('100');
       expect(serialized).toContain('200');
@@ -410,7 +410,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
           b.createCoin(addr, (i + 1) * 50);
         });
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       addresses.forEach(addr => {
         expect(serialized).toContain(addr);
       });
@@ -426,7 +426,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
         .merge(p2)
         .merge(p3);
       
-      const serialized = merged.serialize();
+      const serialized = merged.toChiaLisp();
       expect(serialized).toContain('CREATE_COIN');
       expect(serialized).toContain('RESERVE_FEE');
       expect(serialized).toContain('AGG_SIG_ME');
@@ -454,7 +454,7 @@ describe('PuzzleBuilder - Complex Compositions', () => {
         .require(variable('value').greaterThan(0), 'Value must be positive')
         .createCoin(TEST_ADDRESS, variable('value'));
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       // require generates an if statement that throws on failure
       expect(serialized).toContain('(i'); // if statement
       expect(serialized).toContain('(x)'); // exception

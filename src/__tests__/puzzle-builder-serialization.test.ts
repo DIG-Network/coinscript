@@ -22,7 +22,7 @@ describe('PuzzleBuilder - Serialization', () => {
   describe('ChiaLisp Output Verification', () => {
     test('should generate correct pay to conditions output', () => {
       const p = puzzle().payToConditions();
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       
       // Should be: (mod conditions conditions)
       expect(serialized).toBe('(mod @ (a (q "2") "1"))');
@@ -30,7 +30,7 @@ describe('PuzzleBuilder - Serialization', () => {
 
     test('should generate correct pay to public key output', () => {
       const p = puzzle().payToPublicKey(TEST_PUBKEY);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       
       // Should include signature requirement
       expect(serialized).toContain('(mod @');
@@ -45,7 +45,7 @@ describe('PuzzleBuilder - Serialization', () => {
         .createCoin(TEST_ADDRESS, 1000)
         .reserveFee(10);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('(mod @');
       expect(serialized).toContain('(include condition_codes.clib)');
       expect(serialized).toContain('CREATE_COIN');
@@ -66,7 +66,7 @@ describe('PuzzleBuilder - Serialization', () => {
             b.createCoin(TEST_ADDRESS, 200);
           });
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('(mod choice');
       expect(serialized).toContain('(i (= choice 1)');
       expect(serialized).toContain('(CREATE_COIN');
@@ -81,7 +81,7 @@ describe('PuzzleBuilder - Serialization', () => {
         .createCoin(TEST_ADDRESS, 100)
         .createCoin(TEST_ADDRESS, 200);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).not.toContain('\n');
       expect(serialized).toMatch(/^\(mod/);
     });
@@ -104,7 +104,7 @@ describe('PuzzleBuilder - Serialization', () => {
     test('should handle chialisp format option', () => {
       const p = puzzle().createCoin(TEST_ADDRESS, 100);
       
-      const chialisp = p.serialize({ format: 'chialisp' });
+      const chialisp = p.toChiaLisp();
       expect(chialisp).toContain('mod');
       expect(chialisp).toContain('CREATE_COIN');
     });
@@ -113,7 +113,7 @@ describe('PuzzleBuilder - Serialization', () => {
   describe('Include Management in Output', () => {
     test('should auto-include condition codes when needed', () => {
       const p = puzzle().createCoin(TEST_ADDRESS, 100);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       
       expect(serialized).toContain('(include condition_codes.clib)');
       expect(serialized).toContain('CREATE_COIN'); // Uses symbolic name
@@ -125,7 +125,7 @@ describe('PuzzleBuilder - Serialization', () => {
         .createCoin(TEST_ADDRESS, 100)
         .reserveFee(10);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       const matches = serialized.match(/include condition_codes\.clib/g);
       expect(matches?.length).toBe(1);
     });
@@ -137,7 +137,7 @@ describe('PuzzleBuilder - Serialization', () => {
         .include('custom2.clib')
         .createCoin(TEST_ADDRESS, 100);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       const custom1Index = serialized.indexOf('custom1.clib');
       const conditionIndex = serialized.indexOf('condition_codes.clib');
       const custom2Index = serialized.indexOf('custom2.clib');
@@ -157,7 +157,7 @@ describe('PuzzleBuilder - Serialization', () => {
         list([sym('CREATE_COIN'), variable('recipient').tree, variable('amount').tree])
       );
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('(mod (amount recipient memo)');
     });
 
@@ -172,14 +172,14 @@ describe('PuzzleBuilder - Serialization', () => {
         .createCoin('0x' + '0'.repeat(64), 900)
         .reserveFee(100);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       // Curried params might not appear in base serialization
       expect(serialized).toContain('recipient');
     });
 
     test('should handle no parameters', () => {
       const p = puzzle().returnValue(expr(42));
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       
       expect(serialized).toContain('(mod @');
       expect(serialized).toContain('42');
@@ -196,7 +196,7 @@ describe('PuzzleBuilder - Serialization', () => {
         ])
       );
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toBe('((1 2) (3 4))');
     });
 
@@ -206,7 +206,7 @@ describe('PuzzleBuilder - Serialization', () => {
         list([sym('c'), int(1), list([int(2), int(3)])])
       );
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('(c 1 (2 3))');
     });
 
@@ -214,7 +214,7 @@ describe('PuzzleBuilder - Serialization', () => {
       const p = puzzle().noMod();
       (p as any).addNode(nil);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toBe('()');
     });
   });
@@ -245,7 +245,7 @@ describe('PuzzleBuilder - Serialization', () => {
   describe('Edge Cases in Serialization', () => {
     test('should handle empty strings', () => {
       const p = puzzle().createAnnouncement('');
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       
       expect(serialized).toContain('CREATE_COIN_ANNOUNCEMENT');
       expect(serialized).toContain('0x'); // Empty string as empty hex
@@ -254,7 +254,7 @@ describe('PuzzleBuilder - Serialization', () => {
     test('should handle very large numbers', () => {
       const largeNum = 123456789012345678901234567890n;
       const p = puzzle().createCoin(TEST_ADDRESS, largeNum);
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       
       expect(serialized).toContain('123456789012345678901234567890');
     });
@@ -263,7 +263,7 @@ describe('PuzzleBuilder - Serialization', () => {
       const p = puzzle().noMod();
       (p as any).addNode(hex('hello\nworld\t!'));
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       // Hex encoding should handle special chars
       expect(serialized).toBeDefined();
     });
@@ -277,7 +277,7 @@ describe('PuzzleBuilder - Serialization', () => {
       const p = puzzle().noMod();
       (p as any).addNode(nested);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('0');
       expect(serialized).toContain('19');
       expect(serialized.match(/\(/g)?.length).toBe(21); // 20 lists + 1 for outer parenthesis
@@ -301,7 +301,7 @@ describe('PuzzleBuilder - Serialization', () => {
         .include('singleton_truths.clib')
         .createCoin(TEST_ADDRESS, 1);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('singleton_truths.clib');
       expect(serialized).toContain('CREATE_COIN');
     });
@@ -317,7 +317,7 @@ describe('PuzzleBuilder - Serialization', () => {
         .include('cat_truths.clib')
         .createCoin(TEST_ADDRESS, 100);
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       expect(serialized).toContain('cat_truths.clib');
       expect(serialized).toContain('inner_solution');
     });
@@ -333,7 +333,7 @@ describe('PuzzleBuilder - Serialization', () => {
       ];
       
       testCases.forEach(p => {
-        const serialized = p.serialize();
+        const serialized = p.toChiaLisp();
         
         // Basic syntax checks
         const openParens = (serialized.match(/\(/g) || []).length;
@@ -355,7 +355,7 @@ describe('PuzzleBuilder - Serialization', () => {
           variable('a').add(variable('b')).multiply(variable('c'))
         );
       
-      const serialized = p.serialize();
+      const serialized = p.toChiaLisp();
       // Should be (* (+ a b) c) not (+ a (* b c))
       expect(serialized).toContain('(* (+ a b) c)');
     });

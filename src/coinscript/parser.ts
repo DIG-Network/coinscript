@@ -19,7 +19,7 @@ import {
   createSingletonTemplate
 } from '../layers';
 import { Expression as BuilderExpression } from '../builder/PuzzleBuilder';
-import { sha256tree, list, int, sym, hex, NIL, TreeNode, Atom, List } from '../core';
+import { sha256tree, list, int, sym, hex, NIL, TreeNode, Atom, List, atom } from '../core';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import { addressToPuzzleHash } from '@dignetwork/datalayer-driver';
@@ -733,7 +733,6 @@ export interface CoinScriptCompilationResult {
     coinName: string;
     hasSingleton: boolean;
     hasStatefulActions: boolean;
-    hasInnerPuzzleActions: boolean;
     launcherId?: string;
   };
 }
@@ -2249,10 +2248,9 @@ class CodeGenerator {
     const result: CoinScriptCompilationResult = {
       mainPuzzle: innerPuzzle,
       metadata: {
-        coinName: this.coin.name,
-        hasSingleton: false,
-        hasStatefulActions: false,
-        hasInnerPuzzleActions: false
+              coinName: this.coin.name,
+      hasSingleton: false,
+      hasStatefulActions: false
       }
     };
     
@@ -2267,11 +2265,7 @@ class CodeGenerator {
     );
     result.metadata!.hasStatefulActions = hasStatefulActions;
     
-    // Check if we have any inner puzzle actions
-    const hasInnerPuzzleActions = this.coin.actions.some(action => 
-      action.decorators?.some(d => d.name === 'inner_puzzle')
-    );
-    result.metadata!.hasInnerPuzzleActions = hasInnerPuzzleActions;
+
     
     // Check if we have a state block
     const hasStateBlock = !!this.coin.stateBlock;
@@ -2422,11 +2416,10 @@ class CodeGenerator {
       // Check if we have a default action
       const defaultAction = this.coin.actions.find(a => a.name === 'default');
               const otherActions = this.coin.actions.filter(a => 
-          a.name !== 'default' && 
-          !a.decorators?.some(d => d.name === 'inner_puzzle')
+          a.name !== 'default'
         );
       
-      if (this.coin.actions.length === 1 && defaultAction && !hasInnerPuzzleActions) {
+      if (this.coin.actions.length === 1 && defaultAction) {
         // Only a default action and no inner puzzles - generate it directly without ACTION parameter
         const action = defaultAction;
         
@@ -2478,14 +2471,7 @@ class CodeGenerator {
           innerPuzzle = innerPuzzle.withSolutionParams(...constructorParams);
         }
         
-        // If we have inner puzzle actions, add parameters for them
-        if (hasInnerPuzzleActions) {
-          const innerPuzzleActions = this.coin.actions.filter(a => 
-            a.decorators?.some(d => d.name === 'inner_puzzle')
-          );
-          const innerPuzzleParams = innerPuzzleActions.map(a => `${a.name}_puzzle`);
-          innerPuzzle = innerPuzzle.withSolutionParams(...innerPuzzleParams);
-        }
+
         
         // Build action routing logic
         innerPuzzle.comment('Action routing');
@@ -2550,44 +2536,7 @@ class CodeGenerator {
             .then(b => {
               b.comment(`Action: ${action.name}`);
                 
-                // Check if this is an inner puzzle action
-                const isInnerPuzzle = action.decorators?.some(d => d.name === 'inner_puzzle') || false;
-                
-                if (isInnerPuzzle) {
-                  // Route to inner puzzle
-                  b.comment(`Apply inner puzzle: ${action.name}`);
-                  
-                  // Get the action parameters
-                  const actionParams = action.parameters.map(p => p.name);
-                  if (actionParams.length > 0) {
-                    b.withSolutionParams(...actionParams);
-                  }
-                  
-                  // Apply the inner puzzle with the action parameters
-                  const puzzleParam = variable(`${action.name}_puzzle`);
-                  
-                  // Build the argument list for the inner puzzle
-                  if (actionParams.length > 0) {
-                    // Create a list of the parameters
-                    const paramList = actionParams.reduce((acc, param, index) => {
-                      if (index === 0) {
-                        return variable(param);
-                      }
-                      // Build nested cons cells for multiple params
-                      return expr(list([int(4), variable(param).tree, acc.tree]));
-                    }, variable(actionParams[0]));
-                    
-                    // Apply the puzzle with parameters: (a puzzle_param param_list)
-                    const applyExpr = expr(list([sym('a'), puzzleParam.tree, paramList.tree]));
-                    b.returnValue(applyExpr);
-                  } else {
-                    // Apply with empty list: (a puzzle_param ())
-                    const applyExpr = expr(list([sym('a'), puzzleParam.tree, NIL]));
-                    b.returnValue(applyExpr);
-                  }
-                  
-                  return; // Skip regular action processing
-                }
+
               
               // Check if this is a stateful action
               const isStateful = action.decorators?.some(d => d.name === 'stateful') || false;
@@ -2685,7 +2634,7 @@ class CodeGenerator {
         }
         
         // If there are no other actions but we have a default action
-        if (otherActions.length === 0 && defaultAction && !hasInnerPuzzleActions) {
+        if (otherActions.length === 0 && defaultAction) {
           // No inner puzzle actions - generate default action directly
           const defaultLocalVars = new Map<string, BuilderExpression | string | number>();
           for (const stmt of defaultAction.body) {
@@ -2704,84 +2653,7 @@ class CodeGenerator {
           }
         }
         
-        // Handle mixed actions - need to also handle @inner_puzzle actions in the main routing
-        const innerPuzzleActions = this.coin.actions.filter(a => 
-          a.decorators?.some(d => d.name === 'inner_puzzle')
-        );
-        
-        // If we have inner puzzle actions, we need routing logic (with or without default)
-        if (hasInnerPuzzleActions && otherActions.length === 0) {
-          innerPuzzle.comment('Routing to inner puzzles');
-          
-          // Parameters are already added above in the hasInnerPuzzleActions check
-          
-          const buildInnerPuzzleChain = (actions: ActionDeclaration[], index: number, builder: PuzzleBuilder): void => {
-            if (index >= actions.length) {
-              // No matching action found - use default if available
-              if (defaultAction) {
-                builder.comment('Default action');
-                const defaultLocalVars = new Map<string, BuilderExpression | string | number>();
-                for (const stmt of defaultAction.body) {
-                  CodeGenerator.generateStatementStatic(builder, stmt, this.storageValues, undefined, defaultLocalVars, this.functionDefinitions);
-                }
-                const hasReturn = defaultAction.body.some(stmt => 
-                  stmt.type === 'ExpressionStatement' && 
-                  (stmt as ExpressionStatement).expression.type === 'Identifier' &&
-                  ((stmt as ExpressionStatement).expression as Identifier).name === 'conditions'
-                );
-                if (!hasReturn && defaultAction.body.length === 0) {
-                  builder.returnConditions();
-                }
-              } else {
-                builder.fail("Unknown action");
-              }
-              return;
-            }
-            
-            const action = actions[index];
-            
-            builder.if(variable('ACTION').equals(variable(action.name)))
-              .then(b => {
-                b.comment(`Apply inner puzzle: ${action.name}`);
-                
-                // Get the action parameters
-                const actionParams = action.parameters.map(p => p.name);
-                if (actionParams.length > 0) {
-                  b.withSolutionParams(...actionParams);
-                }
-                
-                // Apply the inner puzzle with the action parameters
-                // Using 'a' (apply) to run the curried inner puzzle
-                const puzzleParam = variable(`${action.name}_puzzle`);
-                
-                // Build the argument list for the inner puzzle
-                if (actionParams.length > 0) {
-                  // Create a list of the parameters
-                  const paramList = actionParams.reduce((acc, param, index) => {
-                    if (index === 0) {
-                      return variable(param);
-                    }
-                    // Build nested cons cells for multiple params
-                    return expr(list([int(4), variable(param).tree, acc.tree]));
-                  }, variable(actionParams[0]));
-                  
-                  // Apply the puzzle with parameters: (a puzzle_param param_list)
-                  const applyExpr = expr(list([sym('a'), puzzleParam.tree, paramList.tree]));
-                  b.returnValue(applyExpr);
-                } else {
-                  // Apply with empty list: (a puzzle_param ())
-                  const applyExpr = expr(list([sym('a'), puzzleParam.tree, NIL]));
-                  b.returnValue(applyExpr);
-                }
-              })
-              .else(b => {
-                // Recursively build the rest of the chain
-                buildInnerPuzzleChain(actions, index + 1, b);
-              });
-          };
-          
-          buildInnerPuzzleChain(innerPuzzleActions, 0, innerPuzzle);
-        }
+
       } else {
         // Old behavior for single non-default spend action (backwards compatibility)
         const spendActions = this.coin.actions.filter(a => a.name.toLowerCase().includes('spend'));
@@ -2873,21 +2745,7 @@ class CodeGenerator {
       }
     }
     
-    // Add inner puzzle action puzzles if any
-    if (hasInnerPuzzleActions) {
-      for (const action of this.coin.actions) {
-        if (action.decorators?.some(d => d.name === 'inner_puzzle')) {
-          const actionPuzzle = this.generateActionPuzzle2(action);
-          // Remove action_ prefix if present
-          const puzzleName = action.name.startsWith('action_') ? action.name.substring(7) : action.name;
-          additionalPuzzles[puzzleName] = actionPuzzle;
-          allPuzzles.push(actionPuzzle);
-        }
-      }
-      if (Object.keys(additionalPuzzles).length > 0) {
-        result.additionalPuzzles = additionalPuzzles;
-      }
-    }
+
     
     // Add main puzzle to allPuzzles (after inner puzzles)
     allPuzzles.push(result.mainPuzzle);
@@ -2918,7 +2776,70 @@ class CodeGenerator {
       const finalPuzzle = new PuzzleBuilder()
         .withMod(finalPuzzleTree);
       
-      result.mainPuzzle = finalPuzzle;
+      // Check if we need to apply state management layer for stateful actions
+      if (hasStatefulActions && (this.coin.stateBlock || (this.coin.state && this.coin.state.length > 0))) {
+        // Calculate action merkle root for state management
+        const actionMerkleRoot = this.calculateActionMerkleRoot();
+        
+        // Build initial state from state declarations
+        const initialStateArray: TreeNode[] = [];
+        if (this.coin.stateBlock) {
+          for (const field of this.coin.stateBlock.fields) {
+            // Get default value for the field's data type
+            const defaultValue = this.getDefaultValue(field.dataType);
+            if (typeof defaultValue === 'number' || typeof defaultValue === 'bigint') {
+              initialStateArray.push(int(defaultValue));
+            } else if (typeof defaultValue === 'string') {
+              initialStateArray.push(atom(defaultValue));
+            } else {
+              initialStateArray.push(int(0));
+            }
+          }
+        } else if (this.coin.state) {
+          for (const stateVar of this.coin.state) {
+            if (stateVar.initialValue) {
+              const value = this.evaluateExpression(stateVar.initialValue);
+              if (typeof value === 'number' || typeof value === 'bigint') {
+                initialStateArray.push(int(value));
+              } else if (typeof value === 'string') {
+                initialStateArray.push(atom(value));
+              } else {
+                initialStateArray.push(int(0));
+              }
+            } else {
+              initialStateArray.push(int(0));
+            }
+          }
+        }
+        
+        // Apply state management layer
+        const stateManagementPuzzle = withStateManagementLayer(finalPuzzle, {
+          actionMerkleRoot,
+          initialState: list(initialStateArray),
+          moduleHash: undefined // Will be calculated by the layer
+        });
+        
+        console.log('🔍 parser - stateManagementPuzzle returned:', {
+          type: typeof stateManagementPuzzle,
+          constructor: stateManagementPuzzle?.constructor?.name,
+          hasMethod: typeof stateManagementPuzzle?.toPuzzleReveal === 'function',
+          proto: Object.getPrototypeOf(stateManagementPuzzle),
+          keys: stateManagementPuzzle ? Object.keys(stateManagementPuzzle) : [],
+          isInstanceOf: stateManagementPuzzle instanceof PuzzleBuilder,
+          hasToPuzzleReveal: 'toPuzzleReveal' in stateManagementPuzzle
+        });
+        
+        // Check if we can create a new PuzzleBuilder here
+        const testPuzzle = new PuzzleBuilder();
+        console.log('🔍 parser - test new PuzzleBuilder:', {
+          hasMethod: typeof testPuzzle?.toPuzzleReveal === 'function',
+          isInstanceOf: testPuzzle instanceof PuzzleBuilder
+        });
+        
+        result.mainPuzzle = stateManagementPuzzle;
+      } else {
+        result.mainPuzzle = finalPuzzle;
+      }
     }
     
     return result;
@@ -4300,47 +4221,7 @@ class CodeGenerator {
   private generateActionPuzzle2(action: ActionDeclaration): PuzzleBuilder {
     const actionPuzzle = new PuzzleBuilder();
     
-    // For @inner_puzzle actions, create a simple mod that validates conditions
-    if (action.decorators?.some(d => d.name === 'inner_puzzle')) {
-      // Check if we need condition codes library
-      let needsConditionCodes = false;
-      for (const stmt of action.body) {
-        if (stmt.type === 'SendStatement' || stmt.type === 'EmitStatement') {
-          needsConditionCodes = true;
-          break;
-        }
-      }
-      
-      if (needsConditionCodes) {
-        actionPuzzle.includeConditionCodes();
-        this._autoIncludes.add('condition_codes.clib');
-      }
-      
-      // Use parameter names for the mod definition
-      const paramNames = action.parameters.map(p => p.name);
-      if (paramNames.length > 0) {
-        actionPuzzle.withSolutionParams(...paramNames);
-      }
-      
-      // Track local variables for this action
-      const localVariables = new Map<string, BuilderExpression | string | number>();
-      
-      // Simple validation logic for inner puzzles
-      for (const stmt of action.body) {
-              // Use the static method with local variables support
-      CodeGenerator.generateStatementStatic(actionPuzzle, stmt, this.storageValues, undefined, localVariables, this.functionDefinitions, this.stateFieldIndices);
-      }
-      
-      // Return empty conditions list if no explicit return
-      if (action.body.length === 0 || 
-          !action.body.some(s => s.type === 'ExpressionStatement')) {
-        actionPuzzle.returnValue(expr(NIL));
-            }
-      
-      return actionPuzzle;
-    }
-    
-    // Original implementation for stateful actions
+    // Implementation for stateful actions
     // Action receives current state and parameters
     const allParams = ['current_state', ...action.parameters.map(p => p.name)];
     actionPuzzle.withSolutionParams(...allParams);
