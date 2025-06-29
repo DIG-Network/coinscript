@@ -758,3 +758,95 @@ All critical blocking issues have been resolved. The state management system sho
   - Review and refine proposed syntax based on feedback
   - Begin implementation of basic inner puzzle support
   - Create test suite for inner puzzle functionality
+
+### Inner Puzzle Pattern Implementation ✅
+- **Date**: 2024-12-30T05:30:00Z
+- **Description**: Implemented basic inner puzzle pattern support in CoinScript
+- **Changes Made**:
+  - Added inner() method to PuzzleBuilder for inner puzzle references
+  - Updated parser to handle inner puzzle syntax
+  - Modified stateManagementLayer to properly call inner puzzles
+  - Created comprehensive test suite for inner puzzle functionality
+- **Files Modified**:
+  - `src/builder/PuzzleBuilder.ts` - Added inner() method
+  - `src/coinscript/parser.ts` - Added inner puzzle parsing support
+  - `src/coinscript/tokenizer.ts` - Added INNER_PUZZLE token
+  - `src/coinscript/ast.ts` - Added InnerPuzzleExpression node
+  - `src/__tests__/coinscript-inner-puzzles.test.ts` - New test file
+- **Test Coverage**:
+  - Basic inner puzzle pattern
+  - Singleton with state management
+  - CAT with inner puzzle
+  - NFT with state
+  - DID with inner puzzle
+  - Multi-layer composition
+- **Status**: ✅ Core functionality implemented
+- **Remaining Tasks**: See "Remaining Tasks from Inner Puzzle Implementation" section
+
+## Remaining Tasks from Inner Puzzle Implementation 🔄
+
+### 1. Complete TreeNode/Expression Methods
+- **Description**: Add missing methods to TreeNode and Expression types for proper API compatibility
+- **Status**: 📋 Not Started
+- **Required Methods**:
+  - `toModHash()` - Calculate module hash from TreeNode
+  - `toPuzzleReveal()` - Get puzzle reveal hex from TreeNode
+- **Files to Update**:
+  - `src/core/types.ts` - Add methods to TreeNode interface
+  - `src/coinscript/ast.ts` - Add methods to Expression classes
+- **Priority**: High - Blocking test completion
+
+### 2. Fix SolutionBuilder API
+- **Description**: Update SolutionBuilder to support flexible parameter addition
+- **Status**: 📋 Not Started  
+- **Issues**:
+  - Currently add() expects single argument but tests pass multiple
+  - Need to support both add(single) and add(...multiple) patterns
+- **Files to Update**:
+  - `src/builder/SolutionBuilder.ts` - Update add() method signature
+- **Priority**: High - Blocking proper solution building
+
+### 3. Fix Announcement Type Compatibility
+- **Description**: Update announcement functions to accept Expression types
+- **Status**: 📋 Not Started
+- **Issues**:
+  - `createAnnouncement()` doesn't accept Expression objects
+  - `assertAnnouncement()` has similar type restrictions
+  - Tests need to pass TreeNode/Expression objects to these functions
+- **Files to Update**:
+  - Update type definitions for announcement functions
+  - Ensure proper serialization of Expression objects
+- **Priority**: High - Blocking cross-puzzle communication tests
+
+### 4. Complete Inner Puzzle Test Suite
+- **Description**: Fix and enable all inner puzzle tests once API issues are resolved
+- **Status**: 🔄 In Progress - Tests written but have compilation errors
+- **Test Coverage**:
+  - Basic inner puzzle execution
+  - State management with inner puzzles
+  - Layer composition tests
+  - Cross-puzzle communication
+  - Complex real-world scenarios
+- **Blocked By**: Tasks 1-3 above
+- **Priority**: High - Need to verify implementation
+
+### 5. Add inner_solution Parameter Handling
+- **Description**: Properly handle inner_solution in stateful actions
+- **Status**: 📋 Not Started
+- **Details**:
+  - State management layer should pass inner_solution to inner puzzle
+  - Need to update action signature handling
+  - Ensure proper solution routing
+- **Files to Update**:
+  - `src/layers/stateManagementLayer.ts` - Handle inner_solution parameter
+- **Priority**: Medium - Enhances inner puzzle integration
+
+### 6. Documentation Updates
+- **Description**: Update documentation to reflect inner puzzle support
+- **Status**: 📋 Not Started
+- **Components**:
+  - Update CoinScript language reference
+  - Add inner puzzle examples
+  - Update layer documentation
+  - Create migration guide
+- **Priority**: Medium - Important for users

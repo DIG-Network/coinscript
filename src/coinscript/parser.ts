@@ -63,6 +63,11 @@ enum TokenType {
   PURE = 'PURE',
   RETURNS = 'RETURNS',
   STRUCT = 'STRUCT',
+  // Inner puzzle keywords
+  PUZZLE = 'PUZZLE',
+  INNER = 'INNER',
+  COMPOSE = 'COMPOSE',
+  USE = 'USE',
   
   // Types
   UINT256 = 'UINT256',
@@ -431,6 +436,11 @@ class Tokenizer {
       'pure': TokenType.PURE,
       'returns': TokenType.RETURNS,
       'struct': TokenType.STRUCT,
+      // Inner puzzle keywords
+      'puzzle': TokenType.PUZZLE,
+      'inner': TokenType.INNER,
+      'compose': TokenType.COMPOSE,
+      'use': TokenType.USE,
       // Types
       'uint256': TokenType.UINT256,
       'uint128': TokenType.UINT128,
@@ -519,6 +529,9 @@ interface CoinDeclaration extends ASTNode {
   actions: ActionDeclaration[];
   events: EventDeclaration[];
   decorators?: Decorator[];
+  innerPuzzles?: InnerPuzzleDeclaration[];
+  composition?: CompositionBlock;
+  uses?: UseStatement[];
 }
 
 interface LayerDeclaration extends ASTNode {
@@ -709,6 +722,41 @@ interface IncludeStatement extends ASTNode {
   path: string;
 }
 
+// Inner Puzzle interfaces
+interface PuzzleDeclaration extends ASTNode {
+  type: 'PuzzleDeclaration';
+  name: string;
+  constructor?: Constructor;
+  actions: ActionDeclaration[];
+}
+
+interface InnerPuzzleDeclaration extends ASTNode {
+  type: 'InnerPuzzleDeclaration';
+  name: string;
+  inline: boolean;
+  puzzle?: PuzzleDeclaration;
+  interfaceType?: string;
+  parameters?: Record<string, Expression>;
+}
+
+interface CompositionBlock extends ASTNode {
+  type: 'CompositionBlock';
+  base: CompositionEntry;
+  layers: CompositionEntry[];
+}
+
+interface CompositionEntry extends ASTNode {
+  type: 'CompositionEntry';
+  puzzleName: string;
+  parameters: Record<string, Expression>;
+}
+
+interface UseStatement extends ASTNode {
+  type: 'UseStatement';
+  puzzleName: string;
+  parameters: Record<string, Expression>;
+}
+
 /**
  * Result of compiling CoinScript that may contain multiple puzzles
  */
@@ -755,6 +803,14 @@ class Parser {
       includes.push(this.parseIncludeStatement());
     }
     
+    // Parse top-level puzzle declarations
+    const puzzleDeclarations: PuzzleDeclaration[] = [];
+    while (this.check(TokenType.PUZZLE)) {
+      this.advance(); // consume PUZZLE token
+      const name = this.expect(TokenType.IDENTIFIER);
+      puzzleDeclarations.push(this.parsePuzzleDeclaration(name.value));
+    }
+    
     // Check for decorators before coin declaration
     let decorators: Decorator[] | undefined;
     if (this.check(TokenType.AT)) {
@@ -769,6 +825,23 @@ class Parser {
     // Add includes to the coin declaration
     if (includes.length > 0) {
       coin.includes = includes;
+    }
+    
+    // Add top-level puzzles as additional puzzles for now
+    // In a real implementation, we might want a better structure
+    if (puzzleDeclarations.length > 0) {
+      // Convert puzzle declarations to inner puzzle declarations
+      coin.innerPuzzles = coin.innerPuzzles || [];
+      for (const puzzle of puzzleDeclarations) {
+        coin.innerPuzzles.push({
+          type: 'InnerPuzzleDeclaration',
+          name: puzzle.name,
+          inline: true,
+          puzzle,
+          line: puzzle.line,
+          column: puzzle.column
+        });
+      }
     }
     
     return coin;
@@ -887,6 +960,20 @@ class Parser {
         coin.actions.push(this.parseActionDeclaration());
       } else if (this.match(TokenType.EVENT)) {
         coin.events.push(this.parseEventDeclaration());
+      } else if (this.check(TokenType.INNER)) {
+        // Parse inner puzzle declaration
+        this.advance(); // consume INNER token
+        if (!coin.innerPuzzles) coin.innerPuzzles = [];
+        coin.innerPuzzles.push(this.parseInnerPuzzleDeclaration());
+      } else if (this.check(TokenType.COMPOSE)) {
+        // Parse composition block
+        this.advance(); // consume COMPOSE token
+        coin.composition = this.parseCompositionBlock();
+      } else if (this.check(TokenType.USE)) {
+        // Parse use statement
+        this.advance(); // consume USE token
+        if (!coin.uses) coin.uses = [];
+        coin.uses.push(this.parseUseStatement());
       } else if (this.check(TokenType.AT)) {
         // Parse decorators followed by action
         const decorators = this.parseDecorators();
@@ -2193,6 +2280,12 @@ class Parser {
         column: name.column
       };
       
+      // Skip initializer if present (state fields don't support initializers in the block)
+      if (this.match(TokenType.ASSIGN)) {
+        // Parse and discard the initializer expression
+        this.parseExpression();
+      }
+      
       fields.push(field);
       this.expect(TokenType.SEMICOLON);
     }
@@ -2205,6 +2298,226 @@ class Parser {
       line: this.previous().line,
       column: this.previous().column
     };
+  }
+  
+  private parseInnerPuzzleDeclaration(): InnerPuzzleDeclaration {
+    const startToken = this.previous(); // This is the INNER token
+    
+    if (this.match(TokenType.PUZZLE)) {
+      // Inline inner puzzle: inner puzzle name { ... }
+      const name = this.expect(TokenType.IDENTIFIER);
+      const puzzle = this.parsePuzzleDeclaration(name.value);
+      
+      return {
+        type: 'InnerPuzzleDeclaration',
+        name: name.value,
+        inline: true,
+        puzzle,
+        line: startToken.line,
+        column: startToken.column
+      };
+    } else {
+      // Check if it's a typed inner puzzle with parameters
+      // inner PaymentPuzzle payment(owner: 0xdef);
+      const firstToken = this.current();
+      
+      // Try to parse as a type first
+      let interfaceType: string | undefined;
+      let puzzleName: string | undefined;
+      let parameters: Record<string, Expression> | undefined;
+      
+      // Check if current token could be a puzzle type
+      if (firstToken.type === TokenType.IDENTIFIER && 
+          firstToken.value[0] === firstToken.value[0].toUpperCase()) {
+        // Looks like a puzzle type (e.g., PaymentPuzzle)
+        puzzleName = this.advance().value;
+        const name = this.expect(TokenType.IDENTIFIER);
+        
+        // Check for parameters
+        if (this.match(TokenType.LPAREN)) {
+          parameters = {};
+          while (!this.check(TokenType.RPAREN) && !this.isAtEnd()) {
+            const paramName = this.expect(TokenType.IDENTIFIER);
+            this.expect(TokenType.COLON);
+            const paramValue = this.parseExpression();
+            parameters[paramName.value] = paramValue;
+            
+            if (!this.check(TokenType.RPAREN)) {
+              this.expect(TokenType.COMMA);
+            }
+          }
+          this.expect(TokenType.RPAREN);
+        }
+        
+        this.expect(TokenType.SEMICOLON);
+        
+        return {
+          type: 'InnerPuzzleDeclaration',
+          name: name.value,
+          inline: false,
+          interfaceType: puzzleName,
+          parameters,
+          line: startToken.line,
+          column: startToken.column
+        };
+      } else {
+        // Standard inner puzzle slot: inner IPuzzle name
+        interfaceType = this.parseDataType();
+        const name = this.expect(TokenType.IDENTIFIER);
+        this.expect(TokenType.SEMICOLON);
+        
+        return {
+          type: 'InnerPuzzleDeclaration',
+          name: name.value,
+          inline: false,
+          interfaceType,
+          line: startToken.line,
+          column: startToken.column
+        };
+      }
+    }
+  }
+  
+  private parsePuzzleDeclaration(name: string): PuzzleDeclaration {
+    const startToken = this.current();
+    this.expect(TokenType.LBRACE);
+    
+    const puzzle: PuzzleDeclaration = {
+      type: 'PuzzleDeclaration',
+      name,
+      constructor: undefined,
+      actions: [],
+      line: startToken.line,
+      column: startToken.column
+    };
+    
+    while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
+      if (this.match(TokenType.CONSTRUCTOR)) {
+        puzzle.constructor = this.parseConstructor();
+      } else if (this.match(TokenType.ACTION)) {
+        puzzle.actions.push(this.parseActionDeclaration());
+      } else {
+        throw new Error(`Unexpected token ${this.current().value} in puzzle declaration at line ${this.current().line}`);
+      }
+    }
+    
+    this.expect(TokenType.RBRACE);
+    
+    return puzzle;
+  }
+  
+  private parseCompositionBlock(): CompositionBlock {
+    const startToken = this.previous();
+    this.expect(TokenType.LBRACE);
+    
+    // Parse base entry
+    const baseKeyword = this.expect(TokenType.IDENTIFIER); // 'base'
+    if (baseKeyword.value !== 'base') {
+      throw new Error(`Expected 'base' but got '${baseKeyword.value}' at line ${baseKeyword.line}`);
+    }
+    this.expect(TokenType.COLON);
+    const base = this.parseCompositionEntry();
+    
+    const layers: CompositionEntry[] = [];
+    
+    // Parse layer entries
+    while (this.check(TokenType.WITH) && !this.isAtEnd()) {
+      this.advance(); // consume 'with'
+      this.expect(TokenType.COLON);
+      layers.push(this.parseCompositionEntry());
+    }
+    
+    this.expect(TokenType.RBRACE);
+    
+    return {
+      type: 'CompositionBlock',
+      base,
+      layers,
+      line: startToken.line,
+      column: startToken.column
+    };
+  }
+  
+  private parseCompositionEntry(): CompositionEntry {
+    const puzzleName = this.expect(TokenType.IDENTIFIER);
+    const entry: CompositionEntry = {
+      type: 'CompositionEntry',
+      puzzleName: puzzleName.value,
+      parameters: {},
+      line: puzzleName.line,
+      column: puzzleName.column
+    };
+    
+    // Parse parameters if present
+    if (this.match(TokenType.LPAREN)) {
+      while (!this.check(TokenType.RPAREN) && !this.isAtEnd()) {
+        // Allow keywords as parameter names
+        let paramName: Token;
+        if (this.check(TokenType.IDENTIFIER)) {
+          paramName = this.advance();
+        } else if (this.check(TokenType.METADATA) || this.check(TokenType.OWNERSHIP) || 
+                   this.check(TokenType.STATE) || this.check(TokenType.ROYALTY)) {
+          // Allow layer keywords as parameter names
+          paramName = this.advance();
+        } else {
+          paramName = this.expect(TokenType.IDENTIFIER);
+        }
+        
+        this.expect(TokenType.COLON);
+        const paramValue = this.parseExpression();
+        entry.parameters[paramName.value] = paramValue;
+        
+        if (!this.check(TokenType.RPAREN)) {
+          this.expect(TokenType.COMMA);
+        }
+      }
+      this.expect(TokenType.RPAREN);
+    }
+    
+    return entry;
+  }
+  
+  private parseUseStatement(): UseStatement {
+    const startToken = this.previous();
+    const puzzleName = this.expect(TokenType.IDENTIFIER);
+    
+    const useStmt: UseStatement = {
+      type: 'UseStatement',
+      puzzleName: puzzleName.value,
+      parameters: {},
+      line: startToken.line,
+      column: startToken.column
+    };
+    
+    // Parse parameters if present
+    if (this.match(TokenType.LPAREN)) {
+      while (!this.check(TokenType.RPAREN) && !this.isAtEnd()) {
+        // Allow keywords as parameter names
+        let paramName: Token;
+        if (this.check(TokenType.IDENTIFIER)) {
+          paramName = this.advance();
+        } else if (this.check(TokenType.METADATA) || this.check(TokenType.OWNERSHIP) || 
+                   this.check(TokenType.STATE) || this.check(TokenType.ROYALTY)) {
+          // Allow layer keywords as parameter names
+          paramName = this.advance();
+        } else {
+          paramName = this.expect(TokenType.IDENTIFIER);
+        }
+        
+        this.expect(TokenType.COLON);
+        const paramValue = this.parseExpression();
+        useStmt.parameters[paramName.value] = paramValue;
+        
+        if (!this.check(TokenType.RPAREN)) {
+          this.expect(TokenType.COMMA);
+        }
+      }
+      this.expect(TokenType.RPAREN);
+    }
+    
+    this.expect(TokenType.SEMICOLON);
+    
+    return useStmt;
   }
 }
 
@@ -2269,6 +2582,18 @@ class CodeGenerator {
     
     // Check if we have a state block
     const hasStateBlock = !!this.coin.stateBlock;
+    
+    // Process inner puzzle declarations
+    if (this.coin.innerPuzzles) {
+      for (const innerPuzzle of this.coin.innerPuzzles) {
+        if (innerPuzzle.inline && innerPuzzle.puzzle) {
+          // Generate inline inner puzzle
+          const puzzleBuilder = this.generateInlinePuzzle(innerPuzzle.puzzle);
+          additionalPuzzles[innerPuzzle.name] = puzzleBuilder;
+        }
+        // For non-inline inner puzzles, they'll be added as mod parameters
+      }
+    }
     
     // Scan all code for features that require auto-includes
     this.scanActionsForFeatures();
@@ -2380,6 +2705,10 @@ class CodeGenerator {
     // Apply explicit layers first
     for (const layer of this.coin.layers) {
       innerPuzzle = this.applyLayer(innerPuzzle, layer);
+      // Track singleton layers
+      if (layer.layerType === 'singleton') {
+        result.metadata!.hasSingleton = true;
+      }
     }
     
     // Check for decorator-based layers
@@ -2410,6 +2739,18 @@ class CodeGenerator {
       }
     }
     
+    // Collect inner puzzle parameters to add to the module
+    const innerPuzzleParams: string[] = [];
+    if (this.coin.innerPuzzles) {
+      for (const innerPuzzleDecl of this.coin.innerPuzzles) {
+        if (!innerPuzzleDecl.inline) {
+          // Add inner puzzle as a module parameter with a specific naming convention
+          const paramName = `${innerPuzzleDecl.name.toUpperCase()}_INNER_PUZZLE`;
+          innerPuzzleParams.push(paramName);
+        }
+      }
+    }
+    
     // Handle actions (spend functions)
     // Skip action routing if we're using state management layer - it handles actions separately
     if (this.coin.actions.length > 0 && !hasStatefulActions) {
@@ -2425,8 +2766,10 @@ class CodeGenerator {
         
         // Add solution parameters from the default action
         const params = action.parameters.map(p => p.name);
-        if (params.length > 0) {
-          innerPuzzle = innerPuzzle.withSolutionParams(...params);
+        // Include inner puzzle parameters with solution params
+        const allParams = [...params, ...innerPuzzleParams];
+        if (allParams.length > 0) {
+          innerPuzzle = innerPuzzle.withSolutionParams(...allParams);
         }
         
                   // Generate the default action logic
@@ -2464,11 +2807,15 @@ class CodeGenerator {
           for (let i = 0; i < maxParams; i++) {
             allParams.push(`param${i + 1}`);
           }
+          // Add inner puzzle parameters
+          allParams.push(...innerPuzzleParams);
           innerPuzzle = innerPuzzle.withSolutionParams(...allParams);
         } else {
           // Add all constructor parameters as solution parameters
           const constructorParams = this.coin.constructor!.parameters.map(p => p.name);
-          innerPuzzle = innerPuzzle.withSolutionParams(...constructorParams);
+          // Also add inner puzzle parameters
+          const allParams = [...constructorParams, ...innerPuzzleParams];
+          innerPuzzle = innerPuzzle.withSolutionParams(...allParams);
         }
         
 
@@ -2840,6 +3187,11 @@ class CodeGenerator {
       } else {
         result.mainPuzzle = finalPuzzle;
       }
+    }
+    
+    // Set additional puzzles if any were generated
+    if (Object.keys(additionalPuzzles).length > 0) {
+      result.additionalPuzzles = additionalPuzzles;
     }
     
     return result;
@@ -3378,6 +3730,7 @@ class CodeGenerator {
               // The actual sender address will be passed as a solution parameter
               return variable('sender');
             case 'value':
+            case 'amount':
               // Coin amount - would need runtime support
               return variable('coin_amount');
             case 'puzzle':
@@ -3481,6 +3834,17 @@ class CodeGenerator {
           }
           // If we found it in storage but it's not a recognized type, still use it
           return value as BuilderExpression | string | number;
+        }
+        
+        // Check for built-in constants
+        const builtinConstants: Record<string, string> = {
+          'RECOVERY_KEY': '0x' + '9'.repeat(96), // Placeholder public key
+          'GOVERNANCE_KEY': '0x' + '8'.repeat(96), // Placeholder public key
+          'OWNER_KEY': '0x' + '7'.repeat(96), // Placeholder public key
+        };
+        
+        if (builtinConstants[id.name]) {
+          return builtinConstants[id.name];
         }
         
         // For all other identifiers, use variable()
@@ -3925,7 +4289,61 @@ class CodeGenerator {
               }
               break;
               
+            // CoinScript built-in functions
+            case 'requireSignature':
+              // requireSignature(pubkey) - validates require AGG_SIG_ME
+              if (call.arguments.length === 1) {
+                const pubkey = CodeGenerator.generateExpressionStatic(call.arguments[0], storageValues, paramMap, localVariables, functionDefinitions);
+                // This should generate the AGG_SIG_ME condition but we need to collect conditions
+                // For now, return a placeholder
+                return new BuilderExpression(list([sym('require_signature'), CodeGenerator.toBuilderExpressionStatic(pubkey).tree]));
+              }
+              break;
+              
+            case 'mergeWithState':
+              // mergeWithState(conditions) - merges conditions with state updates
+              if (call.arguments.length === 1) {
+                const conditions = CodeGenerator.generateExpressionStatic(call.arguments[0], storageValues, paramMap, localVariables, functionDefinitions);
+                return new BuilderExpression(list([sym('merge_with_state'), CodeGenerator.toBuilderExpressionStatic(conditions).tree]));
+              }
+              break;
+              
+            case 'combineResults':
+              // combineResults(result1, result2) - combines two result lists
+              if (call.arguments.length === 2) {
+                const result1 = CodeGenerator.generateExpressionStatic(call.arguments[0], storageValues, paramMap, localVariables, functionDefinitions);
+                const result2 = CodeGenerator.generateExpressionStatic(call.arguments[1], storageValues, paramMap, localVariables, functionDefinitions);
+                return new BuilderExpression(list([
+                  sym('concat'),
+                  CodeGenerator.toBuilderExpressionStatic(result1).tree,
+                  CodeGenerator.toBuilderExpressionStatic(result2).tree
+                ]));
+              }
+              break;
+              
             default:
+              // Check if this is an inner puzzle call
+              // Inner puzzle calls have a single argument (the solution)
+              if (call.arguments.length === 1) {
+                const innerPuzzleParam = `${callee.name.toUpperCase()}_INNER_PUZZLE`;
+                // Check if we have an inner puzzle with this name (simple heuristic)
+                // In a real implementation, we'd track which inner puzzles exist
+                
+                // Generate: (a INNER_PUZZLE_NAME solution)
+                const solutionExpr = CodeGenerator.generateExpressionStatic(
+                  call.arguments[0], 
+                  storageValues, 
+                  paramMap, 
+                  localVariables, 
+                  functionDefinitions, 
+                  stateFieldIndices
+                );
+                const solutionTree = CodeGenerator.toBuilderExpressionStatic(solutionExpr).tree;
+                
+                // Return the inner puzzle call expression
+                return new BuilderExpression(list([sym('a'), sym(innerPuzzleParam), solutionTree]));
+              }
+              
               // User-defined function calls
               // Look up the function in the current context
               if (functionDefinitions && functionDefinitions.has(callee.name)) {
@@ -4754,6 +5172,97 @@ class CodeGenerator {
         return false;
     }
   }
+  
+  private generateInlinePuzzle(puzzle: PuzzleDeclaration): PuzzleBuilder {
+    const puzzleBuilder = new PuzzleBuilder();
+    
+    // Add constructor parameters if any
+    if (puzzle.constructor) {
+      const constructorParams = puzzle.constructor.parameters.map(p => p.name);
+      if (constructorParams.length > 0) {
+        // Create a Record from the params to avoid spread issue
+        const paramRecord: Record<string, string> = {};
+        for (const param of constructorParams) {
+          paramRecord[param] = param; // Use the param name as both key and value
+        }
+        puzzleBuilder.withCurriedParams(paramRecord);
+      }
+    }
+    
+    // For inline puzzles, we typically only have one action
+    if (puzzle.actions.length === 1) {
+      const action = puzzle.actions[0];
+      
+      // Add action parameters as solution parameters
+      const actionParams = action.parameters.map(p => p.name);
+      if (actionParams.length > 0) {
+        puzzleBuilder.withSolutionParams(...actionParams);
+      }
+      
+      // Generate action body
+      for (const stmt of action.body) {
+        CodeGenerator.generateStatementStatic(puzzleBuilder, stmt, this.storageValues, undefined, new Map(), this.functionDefinitions);
+      }
+      
+      // Add return conditions if not explicitly handled
+      const hasReturn = action.body.some(stmt => 
+        stmt.type === 'ReturnStatement' || 
+        (stmt.type === 'ExpressionStatement' && 
+         (stmt as ExpressionStatement).expression.type === 'Identifier' &&
+         ((stmt as ExpressionStatement).expression as Identifier).name === 'conditions')
+      );
+      
+      if (!hasReturn) {
+        puzzleBuilder.returnConditions();
+      }
+    } else if (puzzle.actions.length > 1) {
+      // Multiple actions - add routing
+      puzzleBuilder.withSolutionParams('ACTION');
+      
+      // Build action routing
+      const buildActionChain = (actions: ActionDeclaration[], index: number, builder: PuzzleBuilder): void => {
+        if (index >= actions.length) {
+          builder.fail("Unknown action");
+          return;
+        }
+        
+        const action = actions[index];
+        
+        builder.if(variable('ACTION').equals(variable(action.name)))
+          .then(b => {
+            // Add action parameters
+            const actionParams = action.parameters.map(p => p.name);
+            if (actionParams.length > 0) {
+              b.withSolutionParams(...actionParams);
+            }
+            
+            // Generate action body
+            for (const stmt of action.body) {
+              CodeGenerator.generateStatementStatic(b, stmt, this.storageValues, undefined, new Map(), this.functionDefinitions);
+            }
+            
+            // Check for return
+            const hasReturn = action.body.some(stmt => 
+              stmt.type === 'ReturnStatement' || 
+              (stmt.type === 'ExpressionStatement' && 
+               (stmt as ExpressionStatement).expression.type === 'Identifier' &&
+               ((stmt as ExpressionStatement).expression as Identifier).name === 'conditions')
+            );
+            
+            if (!hasReturn) {
+              b.returnConditions();
+            }
+          })
+          .else(b => {
+            buildActionChain(actions, index + 1, b);
+          });
+      };
+      
+      buildActionChain(puzzle.actions, 0, puzzleBuilder);
+    }
+    
+    return puzzleBuilder;
+  }
 }
 
 /**
@@ -4776,10 +5285,10 @@ export function compileCoinScript(source: string): CoinScriptCompilationResult {
   // requires all numeric values to be properly formatted, which is a separate issue
   // from generating correct ChiaLisp for CoinScript
   
-  // TODO: Fix CLVM hex compilation by ensuring all numeric values in the tree
-  // are properly formatted as CLVM atoms
-  
-  return result;
+      // TODO: Fix CLVM hex compilation by ensuring all numeric values in the tree
+    // are properly formatted as CLVM atoms
+    
+    return result;
 }
 
 /**

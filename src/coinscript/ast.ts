@@ -18,6 +18,11 @@ export interface CoinDeclaration extends ASTNode {
   constructor?: Constructor;
   actions: ActionDeclaration[];
   events: EventDeclaration[];
+  innerPuzzles?: InnerPuzzleDeclaration[];
+  composition?: CompositionBlock;
+  stateBlock?: StateBlock;
+  stateDeclarations?: StateDeclaration[];
+  decorators?: Decorator[];
 }
 
 export interface LayerDeclaration extends ASTNode {
@@ -44,6 +49,10 @@ export interface ActionDeclaration extends ASTNode {
   name: string;
   parameters: Parameter[];
   body: Statement[];
+  decorators?: Decorator[];
+  modifiers?: string[];
+  returnType?: string;
+  visibility?: 'view' | 'pure';
 }
 
 export interface EventDeclaration extends ASTNode {
@@ -140,4 +149,64 @@ export interface Literal extends Expression {
   type: 'Literal';
   value: string | number | boolean;
   raw: string;
+}
+
+// State and Decorator nodes
+export interface StateBlock extends ASTNode {
+  type: 'StateBlock';
+  fields: StateField[];
+}
+
+export interface StateField extends ASTNode {
+  type: 'StateField';
+  dataType: string;
+  name: string;
+  isMapping?: boolean;
+}
+
+export interface StateDeclaration extends ASTNode {
+  type: 'StateDeclaration';
+  dataType: string;
+  name: string;
+  initialValue?: Expression;
+}
+
+export interface Decorator extends ASTNode {
+  type: 'Decorator';
+  name: string;
+  arguments: Expression[];
+}
+
+// Inner Puzzle nodes
+export interface PuzzleDeclaration extends ASTNode {
+  type: 'PuzzleDeclaration';
+  name: string;
+  constructor?: Constructor;
+  actions: ActionDeclaration[];
+}
+
+export interface InnerPuzzleDeclaration extends ASTNode {
+  type: 'InnerPuzzleDeclaration';
+  name: string;
+  inline: boolean;
+  puzzle?: PuzzleDeclaration;
+  interfaceType?: string;
+}
+
+export interface CompositionBlock extends ASTNode {
+  type: 'CompositionBlock';
+  base: CompositionEntry;
+  layers: CompositionEntry[];
+}
+
+export interface CompositionEntry extends ASTNode {
+  type: 'CompositionEntry';
+  puzzleName: string;
+  parameters: Record<string, Expression>;
+}
+
+export interface UseStatement extends ASTNode {
+  type: 'UseStatement';
+  puzzleName: string;
+  parameters: Record<string, Expression>;
 } 
