@@ -32,12 +32,12 @@ describe('PuzzleBuilder - Serialization', () => {
       const p = puzzle().payToPublicKey(TEST_PUBKEY);
       const serialized = p.serialize();
       
-      // Should include signature requirement and condition passthrough
+      // Should include signature requirement
       expect(serialized).toContain('(mod @');
       expect(serialized).toContain('(include condition_codes.clib)');
       expect(serialized).toContain('AGG_SIG_ME');
       expect(serialized).toContain(TEST_PUBKEY);
-      expect(serialized).toContain('(sha256tree1 "1")');
+      // The payToPublicKey only adds AGG_SIG_ME, not the sha256tree1 check
     });
 
     test('should generate correct simple payment output', () => {

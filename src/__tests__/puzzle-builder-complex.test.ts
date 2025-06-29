@@ -455,8 +455,10 @@ describe('PuzzleBuilder - Complex Compositions', () => {
         .createCoin(TEST_ADDRESS, variable('value'));
       
       const serialized = p.serialize();
-      expect(serialized).toContain('assert');
-      expect(serialized).toContain('>');
+      // require generates an if statement that throws on failure
+      expect(serialized).toContain('(i'); // if statement
+      expect(serialized).toContain('(x)'); // exception
+      expect(serialized).toContain('>'); // greater than comparison
     });
   });
 });

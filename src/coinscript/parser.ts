@@ -57,13 +57,31 @@ enum TokenType {
   RETURN = 'RETURN',
   INCLUDE = 'INCLUDE',
   LET = 'LET',
+  // New keywords
+  MODIFIER = 'MODIFIER',
+  VIEW = 'VIEW',
+  PURE = 'PURE',
+  RETURNS = 'RETURNS',
+  STRUCT = 'STRUCT',
   
   // Types
   UINT256 = 'UINT256',
+  UINT128 = 'UINT128',
+  UINT64 = 'UINT64',
+  UINT32 = 'UINT32',
+  UINT16 = 'UINT16',
+  UINT8 = 'UINT8',
+  INT256 = 'INT256',
+  INT128 = 'INT128',
+  INT64 = 'INT64',
+  INT32 = 'INT32',
+  INT16 = 'INT16',
+  INT8 = 'INT8',
   ADDRESS = 'ADDRESS',
   BOOL = 'BOOL',
   MAPPING = 'MAPPING',
   BYTES32 = 'BYTES32',
+  BYTES = 'BYTES',
   STRING_TYPE = 'STRING_TYPE',
   
   // Literals
@@ -185,8 +203,8 @@ class Tokenizer {
       return this.readNumber();
     }
     
-    // Strings - only single quotes supported
-    if (char === "'") {
+    // Strings - both single and double quotes supported
+    if (char === "'" || char === '"') {
       return this.readString();
     }
     
@@ -323,16 +341,17 @@ class Tokenizer {
   private readString(): Token {
     const startLine = this.line;
     const startColumn = this.column;
+    const quote = this.input[this.position];
     
-    // Only single quotes are supported
-    if (this.input[this.position] !== "'") {
-      throw new Error(`Only single quotes are supported for strings at line ${startLine}, column ${startColumn}`);
+    // Support both single and double quotes
+    if (quote !== "'" && quote !== '"') {
+      throw new Error(`Expected quote character at line ${startLine}, column ${startColumn}`);
     }
     
-    this.advance(); // Skip opening single quote
+    this.advance(); // Skip opening quote
     
     let value = '';
-    while (this.position < this.input.length && this.input[this.position] !== "'") {
+    while (this.position < this.input.length && this.input[this.position] !== quote) {
       if (this.input[this.position] === '\\' && this.position + 1 < this.input.length) {
         this.advance();
         // Handle escape sequences
@@ -343,6 +362,7 @@ class Tokenizer {
           case 'r': value += '\r'; break;
           case '\\': value += '\\'; break;
           case "'": value += "'"; break;
+          case '"': value += '"'; break;
           default: value += escaped;
         }
       } else {
@@ -355,7 +375,7 @@ class Tokenizer {
       throw new Error(`Unterminated string at line ${startLine}, column ${startColumn}`);
     }
     
-    this.advance(); // Skip closing single quote
+    this.advance(); // Skip closing quote
     
     return {
       type: TokenType.STRING,
@@ -405,10 +425,29 @@ class Tokenizer {
       'return': TokenType.RETURN,
       'include': TokenType.INCLUDE,
       'let': TokenType.LET,
+      // New keywords
+      'modifier': TokenType.MODIFIER,
+      'view': TokenType.VIEW,
+      'pure': TokenType.PURE,
+      'returns': TokenType.RETURNS,
+      'struct': TokenType.STRUCT,
+      // Types
       'uint256': TokenType.UINT256,
+      'uint128': TokenType.UINT128,
+      'uint64': TokenType.UINT64,
+      'uint32': TokenType.UINT32,
+      'uint16': TokenType.UINT16,
+      'uint8': TokenType.UINT8,
+      'int256': TokenType.INT256,
+      'int128': TokenType.INT128,
+      'int64': TokenType.INT64,
+      'int32': TokenType.INT32,
+      'int16': TokenType.INT16,
+      'int8': TokenType.INT8,
       'address': TokenType.ADDRESS,
       'bool': TokenType.BOOL,
       'bytes32': TokenType.BYTES32,
+      'bytes': TokenType.BYTES,
       'string': TokenType.STRING_TYPE,
       'mapping': TokenType.MAPPING,
       'true': TokenType.TRUE,
@@ -475,6 +514,7 @@ interface CoinDeclaration extends ASTNode {
   stateBlock?: StateBlock;
   constructor?: Constructor;
   constants?: ConstantDeclaration[];
+  modifiers?: ModifierDeclaration[];
   functions?: FunctionDeclaration[];
   actions: ActionDeclaration[];
   events: EventDeclaration[];
@@ -513,6 +553,9 @@ interface ActionDeclaration extends ASTNode {
   parameters: Parameter[];
   body: Statement[];
   decorators?: Decorator[];
+  modifiers?: string[];  // For modifiers applied to actions
+  returnType?: string;  // For view functions that return values
+  visibility?: 'view' | 'pure';  // For view/pure functions
 }
 
 interface EventDeclaration extends ASTNode {
@@ -525,6 +568,14 @@ interface ConstantDeclaration extends ASTNode {
   type: 'ConstantDeclaration';
   name: string;
   value: Expression;
+  dataType?: string;  // For typed constants like: const uint8 STATE_IDLE = 0
+}
+
+interface ModifierDeclaration extends ASTNode {
+  type: 'ModifierDeclaration';
+  name: string;
+  parameters: Parameter[];
+  body: Statement[];
 }
 
 interface FunctionDeclaration extends ASTNode {
@@ -830,6 +881,9 @@ class Parser {
       } else if (this.match(TokenType.FUNCTION) || this.match(TokenType.INLINE)) {
         if (!coin.functions) coin.functions = [];
         coin.functions.push(this.parseFunctionDeclaration());
+      } else if (this.match(TokenType.MODIFIER)) {
+        if (!coin.modifiers) coin.modifiers = [];
+        coin.modifiers.push(this.parseModifierDeclaration());
       } else if (this.match(TokenType.ACTION)) {
         coin.actions.push(this.parseActionDeclaration());
       } else if (this.match(TokenType.EVENT)) {
@@ -1002,6 +1056,31 @@ class Parser {
     }
     
     this.expect(TokenType.RPAREN);
+    
+    // Check for view/pure keywords
+    if (this.match(TokenType.VIEW)) {
+      action.visibility = 'view';
+    } else if (this.match(TokenType.PURE)) {
+      action.visibility = 'pure';
+    }
+    
+    // Check for returns keyword
+    if (this.match(TokenType.RETURNS)) {
+      this.expect(TokenType.LPAREN);
+      action.returnType = this.parseDataType();
+      this.expect(TokenType.RPAREN);
+    }
+    
+    // Parse modifiers
+    const modifiers: string[] = [];
+    while (this.check(TokenType.IDENTIFIER) && !this.check(TokenType.LBRACE)) {
+      modifiers.push(this.advance().value);
+    }
+    
+    if (modifiers.length > 0) {
+      action.modifiers = modifiers;
+    }
+    
     this.expect(TokenType.LBRACE);
     
     while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
@@ -1048,18 +1127,42 @@ class Parser {
   }
   
   private parseConstantDeclaration(): ConstantDeclaration {
-    const name = this.expect(TokenType.IDENTIFIER);
+    let dataType: string | undefined;
+    let name: Token;
+    
+    // Check if there's a type before the name (e.g., const uint8 MAX_VALUE = 10)
+    if (this.check(TokenType.UINT256) || this.check(TokenType.UINT128) || 
+        this.check(TokenType.UINT64) || this.check(TokenType.UINT32) || 
+        this.check(TokenType.UINT16) || this.check(TokenType.UINT8) ||
+        this.check(TokenType.INT256) || this.check(TokenType.INT128) ||
+        this.check(TokenType.INT64) || this.check(TokenType.INT32) ||
+        this.check(TokenType.INT16) || this.check(TokenType.INT8) ||
+        this.check(TokenType.ADDRESS) || this.check(TokenType.BOOL) || 
+        this.check(TokenType.BYTES32) || this.check(TokenType.BYTES) ||
+        this.check(TokenType.STRING_TYPE)) {
+      dataType = this.parseDataType();
+      name = this.expect(TokenType.IDENTIFIER);
+    } else {
+      name = this.expect(TokenType.IDENTIFIER);
+    }
+    
     this.expect(TokenType.ASSIGN);
     const value = this.parseExpression();
     this.expect(TokenType.SEMICOLON);
     
-    return {
+    const constant: ConstantDeclaration = {
       type: 'ConstantDeclaration',
       name: name.value,
       value,
       line: name.line,
       column: name.column
     };
+    
+    if (dataType) {
+      constant.dataType = dataType;
+    }
+    
+    return constant;
   }
   
   private parseFunctionDeclaration(): FunctionDeclaration {
@@ -1109,6 +1212,56 @@ class Parser {
     this.expect(TokenType.RBRACE);
     
     return func;
+  }
+  
+  private parseModifierDeclaration(): ModifierDeclaration {
+    const name = this.expect(TokenType.IDENTIFIER);
+    
+    const modifier: ModifierDeclaration = {
+      type: 'ModifierDeclaration',
+      name: name.value,
+      parameters: [],
+      body: [],
+      line: name.line,
+      column: name.column
+    };
+    
+    this.expect(TokenType.LPAREN);
+    
+    if (!this.check(TokenType.RPAREN)) {
+      modifier.parameters = this.parseParameterList();
+    }
+    
+    this.expect(TokenType.RPAREN);
+    this.expect(TokenType.LBRACE);
+    
+    while (!this.check(TokenType.RBRACE) && !this.isAtEnd()) {
+      // Check for the special placeholder _
+      if (this.check(TokenType.IDENTIFIER) && this.current().value === '_') {
+        this.advance();
+        this.expect(TokenType.SEMICOLON);
+        // Add a special statement to mark where the action body goes
+        const placeholderExpr: Identifier = {
+          type: 'Identifier',
+          name: '_', // Special marker for modifier placeholder
+          line: this.previous().line,
+          column: this.previous().column
+        };
+        const placeholderStmt: ExpressionStatement = {
+          type: 'ExpressionStatement',
+          expression: placeholderExpr,
+          line: this.previous().line,
+          column: this.previous().column
+        };
+        modifier.body.push(placeholderStmt);
+      } else {
+        modifier.body.push(this.parseStatement());
+      }
+    }
+    
+    this.expect(TokenType.RBRACE);
+    
+    return modifier;
   }
   
   private parseParameterList(): Parameter[] {
@@ -1765,6 +1918,26 @@ class Parser {
       return identifier;
     }
     
+    // Check for type casting functions (e.g., bytes32(value))
+    if (this.check(TokenType.UINT256) || this.check(TokenType.UINT128) || 
+        this.check(TokenType.UINT64) || this.check(TokenType.UINT32) || 
+        this.check(TokenType.UINT16) || this.check(TokenType.UINT8) ||
+        this.check(TokenType.INT256) || this.check(TokenType.INT128) ||
+        this.check(TokenType.INT64) || this.check(TokenType.INT32) ||
+        this.check(TokenType.INT16) || this.check(TokenType.INT8) ||
+        this.check(TokenType.ADDRESS) || this.check(TokenType.BOOL) || 
+        this.check(TokenType.BYTES32) || this.check(TokenType.BYTES) ||
+        this.check(TokenType.STRING_TYPE)) {
+      const typeToken = this.advance();
+      const identifier: Identifier = {
+        type: 'Identifier',
+        name: typeToken.value,
+        line: typeToken.line,
+        column: typeToken.column
+      };
+      return identifier;
+    }
+    
     if (this.match(TokenType.LPAREN)) {
       // Check for list literal like (1 2 3)
       const elements: Expression[] = [];
@@ -1862,11 +2035,22 @@ class Parser {
   }
   
   private parseDataType(): string {
-    if (this.match(TokenType.UINT256, TokenType.ADDRESS, TokenType.BOOL, TokenType.BYTES32, TokenType.STRING_TYPE)) {
-      return this.previous().value;
+    let baseType: string | null = null;
+    
+    // Check for all supported types
+    if (this.match(
+      TokenType.UINT256, TokenType.UINT128, TokenType.UINT64, 
+      TokenType.UINT32, TokenType.UINT16, TokenType.UINT8,
+      TokenType.INT256, TokenType.INT128, TokenType.INT64,
+      TokenType.INT32, TokenType.INT16, TokenType.INT8,
+      TokenType.ADDRESS, TokenType.BOOL, TokenType.BYTES32, 
+      TokenType.BYTES, TokenType.STRING_TYPE
+    )) {
+      baseType = this.previous().value;
     }
     
-    if (this.match(TokenType.MAPPING)) {
+    // Check for mapping type
+    else if (this.match(TokenType.MAPPING)) {
       this.expect(TokenType.LPAREN);
       const keyType = this.parseDataType();
       this.expect(TokenType.ARROW);
@@ -1875,7 +2059,30 @@ class Parser {
       return `mapping(${keyType} => ${valueType})`;
     }
     
-    throw new Error(`Expected data type at line ${this.current().line}`);
+    // Check for identifier as type (for future custom types)
+    else if (this.check(TokenType.IDENTIFIER)) {
+      const savedPosition = this.position;
+      baseType = this.advance().value;
+      // For now, identifiers as types are not supported unless it's for an array
+      if (!this.check(TokenType.LBRACKET)) {
+        // Put the identifier back
+        this.position = savedPosition;
+        throw new Error(`Unknown type '${baseType}' at line ${this.current().line}`);
+      }
+    }
+    
+    // If we don't have a base type by now, error
+    if (!baseType) {
+      throw new Error(`Expected data type at line ${this.current().line}`);
+    }
+    
+    // Check for array syntax after any base type
+    if (this.match(TokenType.LBRACKET)) {
+      this.expect(TokenType.RBRACKET);
+      return `${baseType}[]`;
+    }
+    
+    return baseType;
   }
   
   private match(...types: TokenType[]): boolean {
@@ -2063,6 +2270,17 @@ class CodeGenerator {
     
     // Scan all code for features that require auto-includes
     this.scanActionsForFeatures();
+    
+    // Validate state access - only @stateful or view actions can access state
+    if (hasStateBlock || this.coin.state) {
+      for (const action of this.coin.actions) {
+        const isStateful = action.decorators?.some(d => d.name === 'stateful') || false;
+        const isView = action.visibility === 'view';
+        if (!isStateful && !isView && this.actionAccessesState(action)) {
+          throw new Error(`Action '${action.name}' accesses state but is not marked @stateful or view`);
+        }
+      }
+    }
     
     // Process storage variables (immutable, curried into puzzle)
     if (this.coin.storage) {
@@ -2619,7 +2837,7 @@ class CodeGenerator {
       for (const action of this.coin.actions) {
         if (action.decorators?.some(d => d.name === 'stateful')) {
           const actionPuzzle = this.generateActionPuzzle2(action);
-          additionalPuzzles[`action_${action.name}`] = actionPuzzle;
+          additionalPuzzles[action.name] = actionPuzzle;
         }
       }
       if (Object.keys(additionalPuzzles).length > 0) {
@@ -2632,7 +2850,9 @@ class CodeGenerator {
       for (const action of this.coin.actions) {
         if (action.decorators?.some(d => d.name === 'inner_puzzle')) {
           const actionPuzzle = this.generateActionPuzzle2(action);
-          additionalPuzzles[`action_${action.name}`] = actionPuzzle;
+          // Remove action_ prefix if present
+          const puzzleName = action.name.startsWith('action_') ? action.name.substring(7) : action.name;
+          additionalPuzzles[puzzleName] = actionPuzzle;
           allPuzzles.push(actionPuzzle);
         }
       }
@@ -2862,7 +3082,7 @@ class CodeGenerator {
       
       case 'EmitStatement': {
         const emit = stmt as EmitStatement;
-        // Events are implemented as CREATE_PUZZLE_ANNOUNCEMENT with the event data
+        // Events are implemented as CREATE_COIN_ANNOUNCEMENT with the event data
         // Since event names are syntactic sugar, we just announce the data
         
         if (emit.arguments.length > 0) {
@@ -2878,11 +3098,11 @@ class CodeGenerator {
           if (eventData.length === 1) {
             // Single argument - create expression and add as announcement
             const dataExpr = expr(eventData[0]);
-            builder.addCondition(62, dataExpr); // CREATE_PUZZLE_ANNOUNCEMENT
+            builder.addCondition(60, dataExpr); // CREATE_COIN_ANNOUNCEMENT
           } else {
             // Multiple arguments - announce as a list
             const dataExpr = expr(list(eventData));
-            builder.addCondition(62, dataExpr); // CREATE_PUZZLE_ANNOUNCEMENT
+            builder.addCondition(60, dataExpr); // CREATE_COIN_ANNOUNCEMENT
           }
         }
         // If no arguments, don't create an announcement (event names are just syntactic sugar)
@@ -3086,6 +3306,115 @@ class CodeGenerator {
   
   private static generateExpressionStatic(expr: Expression, storageValues?: Map<string, unknown>, paramMap?: Map<string, number>, localVariables?: Map<string, PuzzleExpression | string | number>, functionDefinitions?: Map<string, FunctionDeclaration>): PuzzleExpression | string | number {
     switch (expr.type) {
+      case 'BinaryExpression': {
+        const binExpr = expr as BinaryExpression;
+        const left = CodeGenerator.generateExpressionStatic(binExpr.left, storageValues, paramMap, localVariables, functionDefinitions);
+        const right = CodeGenerator.generateExpressionStatic(binExpr.right, storageValues, paramMap, localVariables, functionDefinitions);
+        const leftPuzzle = CodeGenerator.toPuzzleExpressionStatic(left);
+        const rightPuzzle = CodeGenerator.toPuzzleExpressionStatic(right);
+        
+        switch (binExpr.operator) {
+          case '+':
+            return leftPuzzle.add(rightPuzzle);
+          case '-':
+            return leftPuzzle.subtract(rightPuzzle);
+          case '*':
+            return leftPuzzle.multiply(rightPuzzle);
+          case '/':
+            return leftPuzzle.divide(rightPuzzle);
+          case '%':
+            // Use divmod and extract remainder: (r (divmod a b))
+            return new PuzzleExpression(list([sym('r'), list([sym('divmod'), leftPuzzle.tree, rightPuzzle.tree])]));
+          case '==':
+            return leftPuzzle.equals(rightPuzzle);
+          case '!=':
+            return leftPuzzle.equals(rightPuzzle).not();
+          case '<':
+            return rightPuzzle.greaterThan(leftPuzzle);
+          case '>':
+            return leftPuzzle.greaterThan(rightPuzzle);
+          case '<=':
+            return rightPuzzle.greaterThan(leftPuzzle).not();
+          case '>=':
+            return leftPuzzle.greaterThan(rightPuzzle).or(leftPuzzle.equals(rightPuzzle));
+          case '&&':
+            return leftPuzzle.and(rightPuzzle);
+          case '||':
+            return leftPuzzle.or(rightPuzzle);
+          case '&':
+            return new PuzzleExpression(list([sym('logand'), leftPuzzle.tree, rightPuzzle.tree]));
+          case '|':
+            return new PuzzleExpression(list([sym('logior'), leftPuzzle.tree, rightPuzzle.tree]));
+          case '^':
+            return new PuzzleExpression(list([sym('logxor'), leftPuzzle.tree, rightPuzzle.tree]));
+          case '<<':
+            return new PuzzleExpression(list([sym('lsh'), leftPuzzle.tree, rightPuzzle.tree]));
+          case '>>':
+            return new PuzzleExpression(list([sym('ash'), leftPuzzle.tree, new PuzzleExpression(list([sym('-'), rightPuzzle.tree])).tree]));
+          default:
+            throw new Error(`Unsupported binary operator: ${binExpr.operator}`);
+        }
+      }
+      
+      case 'UnaryExpression': {
+        const unaryExpr = expr as UnaryExpression;
+        const operand = CodeGenerator.generateExpressionStatic(unaryExpr.operand, storageValues, paramMap, localVariables, functionDefinitions);
+        const operandPuzzle = CodeGenerator.toPuzzleExpressionStatic(operand);
+        
+        switch (unaryExpr.operator) {
+          case '!':
+            return operandPuzzle.not();
+          case '-':
+            return new PuzzleExpression(list([sym('-'), operandPuzzle.tree]));
+          case '~':
+            return new PuzzleExpression(list([sym('lognot'), operandPuzzle.tree]));
+          default:
+            throw new Error(`Unsupported unary operator: ${unaryExpr.operator}`);
+        }
+      }
+      
+      case 'MemberExpression': {
+        const memberExpr = expr as MemberExpression;
+        const objName = (memberExpr.object as Identifier).name;
+        const propName = (memberExpr.property as Identifier).name;
+        
+        // Handle special variables
+        if (objName === 'msg') {
+          switch (propName) {
+            case 'sender':
+              // For msg.sender, we need to track that AGG_SIG_ME is required
+              // The actual sender address will be passed as a solution parameter
+              return variable('sender');
+            case 'value':
+              // Coin amount - would need runtime support
+              return variable('coin_amount');
+            case 'puzzle':
+              // Current puzzle hash - would need runtime support
+              return variable('puzzle_hash');
+            default:
+              throw new Error(`Unknown msg property: ${propName}`);
+          }
+        } else if (objName === 'block') {
+          switch (propName) {
+            case 'timestamp':
+              // Current timestamp - would need runtime support
+              return variable('current_timestamp');
+            case 'height':
+              // Current block height - would need runtime support
+              return variable('current_height');
+            default:
+              throw new Error(`Unknown block property: ${propName}`);
+          }
+        } else if (objName === 'state') {
+          // State field access - return a variable reference
+          return variable(`state_${propName}`);
+        } else {
+          // Handle mapping access
+          // For now, just return a placeholder
+          return variable(`${objName}_${propName}`);
+        }
+      }
+      
       case 'Identifier': {
         const id = expr as Identifier;
         
@@ -3152,6 +3481,18 @@ class CodeGenerator {
       case 'Literal': {
         const lit = expr as Literal;
         if (typeof lit.value === 'string' && lit.value.startsWith('0x')) {
+          // Check if it's a short hex address that needs to be normalized
+          const hexValue = lit.value.substring(2); // Remove '0x' prefix
+          // Check if it's an all-zero address pattern (like 0x0, 0x00, etc.)
+          if (/^0+$/.test(hexValue) && hexValue.length < 64) {
+            // Normalize to full 64-character zero address
+            return '0x' + '0'.repeat(64);
+          }
+          // Check if it's a valid 64-character hex string
+          if (hexValue.length === 64 && /^[0-9a-fA-F]+$/.test(hexValue)) {
+            return lit.value; // Return as-is
+          }
+          // For other hex values, return as-is (might be other data types)
           return lit.value;
         }
         if (typeof lit.value === 'number') {
@@ -3161,87 +3502,6 @@ class CodeGenerator {
           return variable(lit.value ? '1' : '0');
         }
         return String(lit.value);
-      }
-      
-      case 'BinaryExpression': {
-        const bin = expr as BinaryExpression;
-        const left = CodeGenerator.generateExpressionStatic(bin.left, storageValues, paramMap, localVariables, functionDefinitions);
-        const right = CodeGenerator.generateExpressionStatic(bin.right, storageValues, paramMap, localVariables, functionDefinitions);
-        
-        // Convert to PuzzleExpression if needed
-        const leftExpr = CodeGenerator.toPuzzleExpressionStatic(left);
-        const rightExpr = CodeGenerator.toPuzzleExpressionStatic(right);
-        
-        switch (bin.operator) {
-          case '+': return leftExpr.add(rightExpr);
-          case '-': return leftExpr.subtract(rightExpr);
-          case '*': return leftExpr.multiply(rightExpr);
-          case '/': return leftExpr.divide(rightExpr);
-                      case '%': 
-              // Use divmod and extract remainder
-              // (divmod a b) returns (quotient . remainder), we want remainder which is (r (divmod a b))
-              return new PuzzleExpression(list([sym('r'), list([sym('divmod'), leftExpr.tree, rightExpr.tree])]))
-          case '>': return leftExpr.greaterThan(rightExpr);
-          case '<': return rightExpr.greaterThan(leftExpr);
-          case '>=': return leftExpr.greaterThan(rightExpr).or(leftExpr.equals(rightExpr));
-          case '<=': return rightExpr.greaterThan(leftExpr).not();
-          case '==': return leftExpr.equals(rightExpr);
-          case '!=': return leftExpr.equals(rightExpr).not();
-          case '&&': return leftExpr.and(rightExpr);
-          case '||': return leftExpr.or(rightExpr);
-          case '>s': return leftExpr.greaterThanBytes(rightExpr); // String/bytes comparison
-          
-          // Bitwise operators
-          case '&': return new PuzzleExpression(list([sym('logand'), leftExpr.tree, rightExpr.tree]));
-          case '|': return new PuzzleExpression(list([sym('logior'), leftExpr.tree, rightExpr.tree]));
-          case '^': return new PuzzleExpression(list([sym('logxor'), leftExpr.tree, rightExpr.tree]));
-          case '<<': return new PuzzleExpression(list([sym('lsh'), leftExpr.tree, rightExpr.tree]));
-          case '>>': return new PuzzleExpression(list([sym('ash'), leftExpr.tree, new PuzzleExpression(list([sym('-'), rightExpr.tree])).tree])); // ash with negative for right shift
-          
-          default: return leftExpr;
-        }
-      }
-      
-      case 'UnaryExpression': {
-        const unary = expr as UnaryExpression;
-        const operand = CodeGenerator.generateExpressionStatic(unary.operand, storageValues, paramMap, localVariables, functionDefinitions);
-        const operandExpr = CodeGenerator.toPuzzleExpressionStatic(operand);
-        
-        switch (unary.operator) {
-          case '!': return operandExpr.not();
-          case '-': return variable('0').subtract(operandExpr);
-          case '~': return new PuzzleExpression(list([sym('lognot'), operandExpr.tree]));
-          default: return operandExpr;
-        }
-      }
-      
-      case 'MemberExpression': {
-        const member = expr as MemberExpression;
-        const objId = member.object as Identifier;
-        
-        // Handle special cases like msg.sender, msg.value
-        if (objId.type === 'Identifier' && objId.name === 'msg') {
-          const propId = member.property as Identifier;
-          if (propId.type === 'Identifier') {
-            if (propId.name === 'value') {
-              return variable('@'); // Amount
-            } else if (propId.name === 'sender') {
-              return variable('sender');
-            }
-          }
-        }
-        
-        // Handle state.field access in stateful actions
-        if (objId.type === 'Identifier' && objId.name === 'state') {
-          const propId = member.property as Identifier;
-          if (propId.type === 'Identifier') {
-            // Access state field from current_state parameter
-            // This would need proper tree traversal in real implementation
-            return variable(`state_${propId.name}`);
-          }
-        }
-        
-        return CodeGenerator.generateExpressionStatic(member.object, storageValues, paramMap, localVariables, functionDefinitions);
       }
       
       case 'CallExpression': {
@@ -3469,9 +3729,27 @@ class CodeGenerator {
               return new PuzzleExpression(sym('@'));
               
             case 'currentTime':
-              // This would need to be implemented with ASSERT_SECONDS_RELATIVE or similar
-              // For now, return a placeholder that indicates current time
-              return variable('current_timestamp');
+              // Returns current timestamp using CLVM environment
+              // This generates a call to get the current time from the block
+              return new PuzzleExpression(list([sym('current_time')]));
+              
+            case 'currentHeight':
+              // Returns current block height using CLVM environment
+              return new PuzzleExpression(list([sym('current_height')]));
+              
+            case 'recreateSelf':
+              // Recreates the coin with the same puzzle hash
+              // This needs to be handled at a higher level in statement generation
+              return new PuzzleExpression(list([sym('recreate_self')]));
+              
+            case 'coinID':
+              // Returns the current coin's ID
+              // In CLVM, this would be calculated from parent, puzzle_hash, amount
+              return new PuzzleExpression(list([sym('coin_id')]));
+              
+            case 'puzzleHash':
+              // Returns the current puzzle hash
+              return new PuzzleExpression(list([sym('puzzle_hash')]));
               
             case 'sha256tree':
               // From sha256tree.clib - calculate tree hash of a value
@@ -3491,6 +3769,58 @@ class CodeGenerator {
               if (call.arguments.length > 0) {
                 const arg = CodeGenerator.generateExpressionStatic(call.arguments[0], storageValues);
                 return CodeGenerator.toPuzzleExpressionStatic(arg);
+              }
+              break;
+              
+            // Type casting functions
+            case 'bytes32':
+              if (call.arguments.length > 0) {
+                const arg = CodeGenerator.generateExpressionStatic(call.arguments[0], storageValues, paramMap, localVariables, functionDefinitions);
+                // For bytes32 casting, we need to ensure the value is 32 bytes
+                // In ChiaLisp, this might involve padding or truncating
+                return CodeGenerator.toPuzzleExpressionStatic(arg);
+              }
+              break;
+              
+            case 'uint256':
+            case 'uint128':
+            case 'uint64':
+            case 'uint32':
+            case 'uint16':
+            case 'uint8':
+            case 'int256':
+            case 'int128':
+            case 'int64':
+            case 'int32':
+            case 'int16':
+            case 'int8':
+              // Integer type casting - just return the value
+              if (call.arguments.length > 0) {
+                const arg = CodeGenerator.generateExpressionStatic(call.arguments[0], storageValues, paramMap, localVariables, functionDefinitions);
+                return CodeGenerator.toPuzzleExpressionStatic(arg);
+              }
+              break;
+              
+            case 'address':
+              // Address type casting
+              if (call.arguments.length > 0) {
+                const arg = CodeGenerator.generateExpressionStatic(call.arguments[0], storageValues, paramMap, localVariables, functionDefinitions);
+                return CodeGenerator.toPuzzleExpressionStatic(arg);
+              }
+              break;
+              
+            case 'bool':
+              // Boolean type casting - convert to 0 or 1
+              if (call.arguments.length > 0) {
+                const arg = CodeGenerator.generateExpressionStatic(call.arguments[0], storageValues, paramMap, localVariables, functionDefinitions);
+                const argExpr = CodeGenerator.toPuzzleExpressionStatic(arg);
+                // Convert to boolean: if arg != 0 then 1 else 0
+                return new PuzzleExpression(list([
+                  sym('i'),
+                  argExpr.tree,
+                  int(1),
+                  int(0)
+                ]));
               }
               break;
               
@@ -4293,6 +4623,107 @@ class CodeGenerator {
       for (const stmt of this.coin.constructor.body) {
         this.scanStatementForFeatures(stmt);
       }
+    }
+  }
+  
+  /**
+   * Check if an action accesses state
+   */
+  private actionAccessesState(action: ActionDeclaration): boolean {
+    for (const stmt of action.body) {
+      if (this.statementAccessesState(stmt)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  /**
+   * Check if a statement accesses state
+   */
+  private statementAccessesState(stmt: Statement): boolean {
+    switch (stmt.type) {
+      case 'ExpressionStatement': {
+        const exprStmt = stmt as ExpressionStatement;
+        return this.expressionAccessesState(exprStmt.expression);
+      }
+      case 'AssignmentStatement': {
+        const assign = stmt as AssignmentStatement;
+        return this.expressionAccessesState(assign.target) || 
+               this.expressionAccessesState(assign.value);
+      }
+      case 'RequireStatement': {
+        const req = stmt as RequireStatement;
+        return this.expressionAccessesState(req.condition);
+      }
+      case 'SendStatement': {
+        const send = stmt as SendStatement;
+        return this.expressionAccessesState(send.recipient) ||
+               this.expressionAccessesState(send.amount) ||
+               (send.memo ? this.expressionAccessesState(send.memo) : false);
+      }
+      case 'EmitStatement': {
+        const emit = stmt as EmitStatement;
+        return emit.arguments.some(arg => this.expressionAccessesState(arg));
+      }
+      case 'IfStatement': {
+        const ifStmt = stmt as IfStatement;
+        if (this.expressionAccessesState(ifStmt.condition)) return true;
+        for (const s of ifStmt.thenBody) {
+          if (this.statementAccessesState(s)) return true;
+        }
+        if (ifStmt.elseBody) {
+          for (const s of ifStmt.elseBody) {
+            if (this.statementAccessesState(s)) return true;
+          }
+        }
+        return false;
+      }
+      case 'ReturnStatement': {
+        const ret = stmt as ReturnStatement;
+        return ret.value ? this.expressionAccessesState(ret.value) : false;
+      }
+      default:
+        return false;
+    }
+  }
+  
+  /**
+   * Check if an expression accesses state
+   */
+  private expressionAccessesState(expr: Expression): boolean {
+    switch (expr.type) {
+      case 'Identifier': {
+        const id = expr as Identifier;
+        return id.name === 'state';
+      }
+      case 'MemberExpression': {
+        const mem = expr as MemberExpression;
+        // Check if it's state.something
+        if (mem.object.type === 'Identifier' && 
+            (mem.object as Identifier).name === 'state') {
+          return true;
+        }
+        // Recursively check
+        return this.expressionAccessesState(mem.object) ||
+               this.expressionAccessesState(mem.property);
+      }
+      case 'BinaryExpression': {
+        const bin = expr as BinaryExpression;
+        return this.expressionAccessesState(bin.left) ||
+               this.expressionAccessesState(bin.right);
+      }
+      case 'UnaryExpression': {
+        const unary = expr as UnaryExpression;
+        return this.expressionAccessesState(unary.operand);
+      }
+      case 'CallExpression': {
+        const call = expr as CallExpression;
+        if (this.expressionAccessesState(call.callee)) return true;
+        return call.arguments.some(arg => this.expressionAccessesState(arg));
+      }
+      default:
+        return false;
     }
   }
 }
