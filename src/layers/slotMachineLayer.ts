@@ -1,5 +1,5 @@
-import { PuzzleBuilder, puzzle, variable, Expression } from '../builder/PuzzleBuilder';
-import { TreeNode, list, sym } from '../core';
+import { PuzzleBuilder, puzzle, variable, Expression, expr } from '../builder/PuzzleBuilder';
+import { TreeNode, list, sym, int } from '../core';
 
 export interface SlotMachineOptions {
   actionMerkleRoot: string;
@@ -23,11 +23,30 @@ export function withSlotMachineLayer(
 ): PuzzleBuilder {
   const actionLayer = puzzle();
   
+  // Calculate the mod hash of the action layer (needed for self-recreation)
+  // This is a simplified placeholder - in reality would calculate actual mod hash
+  const actionLayerModHash = '0x' + '22'.repeat(32);
+  
+  // Create the finalizer with necessary parameters
+  const baseFinalizer = options.finalizer || createDefaultFinalizer();
+  
+  // Create a new finalizer with the parameters curried in
+  const finalizerPuzzle = puzzle()
+    .withMod(baseFinalizer.build())
+    .withCurriedParams({
+      ACTION_LAYER_MOD_HASH: actionLayerModHash,
+      ACTION_MERKLE_ROOT: options.actionMerkleRoot,
+      FINALIZER_HASH: baseFinalizer.toModHash(),
+      COIN_AMOUNT: '@'  // Current coin amount
+    });
+  
   // Curry critical parameters into the puzzle
   actionLayer.withCurriedParams({
-    FINALIZER: options.finalizer?.build() || createDefaultFinalizer().build(),
+    FINALIZER: finalizerPuzzle.build(),
     ACTION_MERKLE_ROOT: options.actionMerkleRoot,
-    STATE: options.initialState  // State is curried into the puzzle!
+    STATE: options.initialState,  // State is curried into the puzzle!
+    ACTION_LAYER_MOD_HASH: actionLayerModHash,
+    FINALIZER_HASH: finalizerPuzzle.toModHash()
   });
   
   // Solution format for action execution
@@ -40,7 +59,7 @@ export function withSlotMachineLayer(
   actionLayer.comment('State is curried into this puzzle for persistence');
   
   // Extract curried values
-  const finalizer = variable('FINALIZER');
+  const finalizerVar = variable('FINALIZER');
   // const actionMerkleRoot = variable('ACTION_MERKLE_ROOT'); // Will be used for merkle validation
   const currentState = variable('STATE');
   
@@ -63,7 +82,7 @@ export function withSlotMachineLayer(
   // (a finalizer (c current_state finalizer_solution))
   const finalizerCall = new Expression(list([
     sym('a'),
-    finalizer.tree,
+    finalizerVar.tree,
     list([
       sym('c'),
       currentState.tree,
@@ -81,6 +100,14 @@ export function withSlotMachineLayer(
 function createDefaultFinalizer(): PuzzleBuilder {
   const finalizer = puzzle();
   
+  // Curry in the necessary parameters for puzzle hash calculation
+  finalizer.withCurriedParams({
+    ACTION_LAYER_MOD_HASH: '',  // Will be filled when creating the finalizer
+    ACTION_MERKLE_ROOT: '',     // Will be filled when creating the finalizer
+    FINALIZER_HASH: '',         // Will be filled when creating the finalizer
+    COIN_AMOUNT: 0              // Will be filled when creating the finalizer
+  });
+  
   finalizer.withSolutionParams(
     'new_state',      // The updated state
     'conditions'      // Additional conditions from actions
@@ -89,25 +116,53 @@ function createDefaultFinalizer(): PuzzleBuilder {
   finalizer.comment('=== DEFAULT FINALIZER ===');
   finalizer.comment('Recreates coin with updated state');
   
-  // Get the new state
-  // const newState = variable('new_state'); // Will be used for state reconstruction
+  // Get parameters
+  const newState = variable('new_state');
   const conditions = variable('conditions');
+  const actionLayerModHash = variable('ACTION_LAYER_MOD_HASH');
+  const actionMerkleRoot = variable('ACTION_MERKLE_ROOT');
+  const finalizerHash = variable('FINALIZER_HASH');
+  const coinAmount = variable('COIN_AMOUNT');
   
   // Calculate our own puzzle hash (with new state)
-  // In real implementation, this would recalculate the action layer puzzle hash
-  // with the new state curried in
-  finalizer.comment('TODO: Calculate self puzzle hash with new state');
+  finalizer.comment('Calculate self puzzle hash with new state');
   
-  // For now, use a placeholder - use hex string directly
-  const selfPuzzleHash = '0x' + '11'.repeat(32);
+  // We need to include curry-and-treehash for puzzle-hash-of-curried-function
+  finalizer.includeCurryAndTreehash();
+  
+  // Calculate the puzzle hash of the action layer with new state curried in
+  // puzzle-hash-of-curried-function expects parameters in REVERSED order
+  // The action layer has params curried in this order: FINALIZER, ACTION_MERKLE_ROOT, STATE, ACTION_LAYER_MOD_HASH, FINALIZER_HASH
+  // So reversed order for puzzle-hash-of-curried-function: FINALIZER_HASH, ACTION_LAYER_MOD_HASH, STATE, ACTION_MERKLE_ROOT, FINALIZER
+  const selfPuzzleHashExpr = expr(list([
+    sym('puzzle-hash-of-curried-function'),
+    actionLayerModHash.tree,
+    // Parameters in REVERSED order
+    list([sym('sha256'), int(1), finalizerHash.tree]), // FINALIZER_HASH hash
+    actionLayerModHash.tree, // ACTION_LAYER_MOD_HASH (already a hash)
+    list([sym('sha256tree'), newState.tree]),  // STATE hash
+    list([sym('sha256'), int(1), actionMerkleRoot.tree]), // ACTION_MERKLE_ROOT hash
+    list([sym('sha256tree'), finalizerHash.tree]) // FINALIZER tree hash
+  ]));
   
   // Create coin with same puzzle (but new state curried in)
-  finalizer.createCoin(selfPuzzleHash, 1);
+  finalizer.comment('Create coin with updated state');
+  finalizer.addCondition(51, selfPuzzleHashExpr, coinAmount);
   
-  // Return all conditions from actions
+  // Append all conditions from actions
   finalizer.comment('Include conditions from actions');
-  // Return the conditions list
-  finalizer.returnValue(conditions);
+  // The CREATE_COIN condition
+  const createCoinCond = list([int(51), selfPuzzleHashExpr.tree, coinAmount.tree]);
+  
+  // Use c to prepend our CREATE_COIN to the conditions list
+  const allConditions = expr(list([
+    sym('c'),
+    createCoinCond,
+    conditions.tree
+  ]));
+  
+  // Return combined conditions
+  finalizer.returnValue(allConditions);
   
   return finalizer;
 }

@@ -1,5 +1,0 @@
-coin TestTransfer {
-    action spend(address to, uint256 amount) {
-        transfer(to, amount, 0x1234);
-    }
-}

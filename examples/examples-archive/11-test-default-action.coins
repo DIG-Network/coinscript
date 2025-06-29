@@ -1,6 +1,0 @@
-// Test 2: Default action only
-coin DefaultActionOnly {
-    action default(bytes32 conditions) {
-        conditions
-    }
-} 

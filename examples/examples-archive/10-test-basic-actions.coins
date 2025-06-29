@@ -1,6 +1,0 @@
-// Test 1: Single action coin
-coin SingleAction {
-    action spend(bytes32 conditions) {
-        conditions
-    }
-} 

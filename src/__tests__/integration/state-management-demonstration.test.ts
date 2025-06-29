@@ -5,12 +5,9 @@
  * system works across blocks, showing state persistence, transitions, and validation.
  */
 
-import { PuzzleBuilder, puzzle } from '../../builder/PuzzleBuilder';
 import { createSolution } from '../../builder/SolutionBuilder';
 import { compileCoinScript } from '../../coinscript';
-import { Program } from 'clvm-lib';
 import { serialize } from '../../core/serializer';
-import { int, list, atom } from '../../core';
 
 describe('State Management System Demonstration', () => {
   
@@ -109,7 +106,7 @@ describe('State Management System Demonstration', () => {
       console.log(`  State: ${JSON.stringify(stateAfterIncrement, null, 2)}`);
       
       // Create solution for setValue action
-      const solution2 = createSolution()
+      createSolution()
         .addAction('setValue', [42])
         .addState(stateAfterIncrement)
         .build();
@@ -128,7 +125,7 @@ describe('State Management System Demonstration', () => {
       console.log(`  State: ${JSON.stringify(stateAfterSetValue, null, 2)}`);
       
       // Create solution for reset action
-      const solution3 = createSolution()
+      createSolution()
         .addAction('reset')
         .addState(stateAfterSetValue)
         .build();

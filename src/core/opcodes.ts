@@ -4,7 +4,7 @@
  * Named constants for all CLVM operators to improve code readability
  */
 
-import { sym } from './builders';
+import { sym, atom } from './builders';
 import { TreeNode } from './types';
 
 // Core operators
@@ -90,7 +90,7 @@ export const ONE: TreeNode = sym('1');
 export const MINUS_ONE: TreeNode = sym('-1');
 
 // Common constants
-export const NIL: TreeNode = sym('()');
+export const NIL: TreeNode = atom(null);
 export const TRUE: TreeNode = ONE;  // 1 is true
 export const FALSE: TreeNode = NIL; // nil is false
 
