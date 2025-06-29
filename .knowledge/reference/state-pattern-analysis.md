@@ -102,10 +102,10 @@ The `CodeGenerator` class handles state in several ways:
      const actionMerkleRoot = this.calculateActionMerkleRoot();
      const initialStateTree = list([int(0)]); // Placeholder
      
-     innerPuzzle = withSlotMachineLayer(innerPuzzle, {
-       actionMerkleRoot,
-       initialState: initialStateTree
-     });
+         innerPuzzle = withStateManagementLayer(innerPuzzle, {
+      actionMerkleRoot,
+      initialState: initialStateTree
+    });
    }
    ```
 
@@ -152,14 +152,14 @@ CoinScript implements the Chialisp state pattern documented in `chialisp-state.m
 - Linear coin chain maintains state history
 - State persistence through puzzle hash commitment
 
-### Slot Machine Layer
+### State Management Layer
 
-The slot machine layer provides advanced state management:
+The state management layer provides persistence for stateful actions:
 
 ```typescript
-export function withSlotMachineLayer(
+export function withStateManagementLayer(
   _innerPuzzle: PuzzleBuilder,
-  options: SlotMachineOptions
+  options: StateManagementOptions
 ): PuzzleBuilder {
   const actionLayer = puzzle();
   
@@ -367,7 +367,7 @@ Testing revealed critical issues in the generated ChiaLisp code:
 
 The slot machine layer is being applied (evident from `action_spends` and `finalizer_solution` parameters), but:
 
-1. The default finalizer in `slotMachineLayer.ts` uses placeholder hex for puzzle hash
+1. The default finalizer in state management layer uses placeholder hex for puzzle hash
 2. Action generation is incomplete - only routing logic exists
 3. String concatenation in code generation creates invalid ChiaLisp
 

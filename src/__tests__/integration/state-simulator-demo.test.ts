@@ -20,6 +20,7 @@ import { Program } from 'clvm-lib';
 describe('State Management Demo with Chia Simulator', () => {
   let peer: Peer;
   let tls: Tls;
+  let masterSecretKey: Buffer;
 
 
   beforeAll(async () => {

@@ -15,7 +15,7 @@ import {
   withNotificationLayer, 
   withTransferProgramLayer,
   withActionLayer,
-  withSlotMachineLayer,
+  withStateManagementLayer,
   createSingletonTemplate
 } from '../layers';
 import { Expression as BuilderExpression } from '../builder/PuzzleBuilder';
@@ -2376,8 +2376,8 @@ class CodeGenerator {
         ? list(stateFields)
         : NIL;  // Empty state if no fields
       
-      // Apply slot machine layer
-      innerPuzzle = withSlotMachineLayer(innerPuzzle, {
+      // Apply state management layer
+      innerPuzzle = withStateManagementLayer(innerPuzzle, {
         actionMerkleRoot,
         initialState: initialStateTree
       });
@@ -2417,7 +2417,7 @@ class CodeGenerator {
     }
     
     // Handle actions (spend functions)
-    // Skip action routing if we're using slot machine layer - it handles actions separately
+    // Skip action routing if we're using state management layer - it handles actions separately
     if (this.coin.actions.length > 0 && !hasStatefulActions) {
       // Check if we have a default action
       const defaultAction = this.coin.actions.find(a => a.name === 'default');

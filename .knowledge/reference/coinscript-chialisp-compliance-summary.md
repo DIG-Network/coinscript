@@ -28,7 +28,7 @@ This document summarizes the compliance analysis between CoinScript-generated Ch
 
 5. **State Management Patterns** (2 tests)
    - ✅ Implements state access patterns
-   - ✅ Handles stateful actions with slot machine pattern
+   - ✅ Handles stateful actions with state management layer
 
 6. **Security Patterns** (2 tests)
    - ✅ Implements access control with signatures
@@ -73,7 +73,7 @@ CoinScript correctly implements the following ChiaLisp patterns:
    - Nested conditionals
 
 4. **State Management**
-   - Slot machine pattern for stateful contracts
+   - State management layer for stateful contracts
    - State field access with list operations
    - State persistence through recreateSelf()
 

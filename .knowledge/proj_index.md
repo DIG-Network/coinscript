@@ -77,7 +77,7 @@ The Chia Puzzle Framework is a comprehensive TypeScript framework for building s
 - **`royaltyLayer.ts`** - Royalty payment layer
 - **`notificationLayer.ts`** - Cross-puzzle messaging
 - **`actionLayer.ts`** - Action-based state machines
-- **`slotMachineLayer.ts`** - Slot machine pattern
+- **`stateManagementLayer.ts`** - State management pattern
 - **`transferProgramLayer.ts`** - Transfer program support
 - **`layerComposition.ts`** - Layer composition utilities
 - **`index.ts`** - Module exports

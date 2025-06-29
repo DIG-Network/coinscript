@@ -5,8 +5,11 @@
 export {
   StateManager,
   ActionMerkleTree,
-  StatefulCoinManager,
-  // Export interfaces too
+  StatefulCoinManager
+} from './stateManager';
+
+// Export interfaces separately with export type
+export type {
   StateField,
   CoinState
 } from './stateManager'; 

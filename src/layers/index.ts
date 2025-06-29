@@ -1,19 +1,16 @@
 /**
- * Generic Layer System
+ * Layers Module
  * 
- * Composable layers that can be applied to any puzzle
+ * Export all available layer functions for puzzle composition
  */
 
 export * from './singletonLayer';
-export * from './stateLayer';
 export * from './ownershipLayer';
+export * from './stateLayer';
+export * from './notificationLayer';
 export * from './royaltyLayer';
 export * from './metadataLayer';
-export * from './notificationLayer';
 export * from './transferProgramLayer';
-export * from './actionLayer';
 export * from './layerComposition';
-export * from './slotMachineLayer';
-
-// Re-export layer composition utilities
-export * from './layerComposition'; 
+export * from './stateManagementLayer';
+export * from './actionLayer'; 

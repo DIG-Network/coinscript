@@ -7,16 +7,18 @@ This index provides a comprehensive guide to all reference documentation in the 
 
 ### 1. State Pattern Analysis
 - **File**: `./.knowledge/reference/state-pattern-analysis.md`
-- **Description**: Deep analysis of the state machine pattern implementation in ChiaLisp
+- **Description**: Deep analysis of the state management pattern implementation in CoinScript
 - **Key Concepts**:
-  - State machine puzzle structure
+  - State persistence across coin spends
   - Action-based state transitions
-  - Merkle tree integration
-  - Security considerations
+  - State management layer architecture
+  - CoinScript @stateful decorator
 - **When to Consult**:
   - Implementing stateful CoinScript contracts
-  - Understanding slot machine pattern
-  - Debugging state persistence issues
+  - Understanding state persistence patterns
+  - Debugging state-related issues
+
+
 
 ### 2. Simulator State Testing
 - **File**: `./.knowledge/reference/simulator-state-testing.md`

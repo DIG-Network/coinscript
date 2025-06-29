@@ -6,7 +6,7 @@ description: Complete guide to managing mutable state in CoinScript using the sl
 
 # State Management in CoinScript
 
-CoinScript provides powerful state management capabilities using the slot-machine pattern, pioneered by Yakuhito. This allows smart coins to maintain mutable state across spends while keeping that state hidden until the coin is spent.
+CoinScript provides powerful state management capabilities that allow smart coins to maintain mutable state across spends while keeping that state hidden until the coin is spent.
 
 ## Overview
 

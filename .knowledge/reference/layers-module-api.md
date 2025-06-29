@@ -200,20 +200,20 @@ class OracleAction extends BaseAction
 class DelegatedStateAction extends BaseAction
 ```
 
-## Slot Machine Layer
+## State Management Layer
 
-Implements the slot machine pattern for stateful puzzles with action routing.
+Implements state persistence for stateful puzzles with action routing.
 
 ### Functions
 
 ```typescript
-// Wrap puzzle with slot machine layer
-withSlotMachineLayer(
+// Wrap puzzle with state management layer
+withStateManagementLayer(
   innerPuzzle: PuzzleBuilder | TreeNode,
-  options: SlotMachineOptions
+  options: StateManagementOptions
 ): PuzzleBuilder
 
-interface SlotMachineOptions {
+interface StateManagementOptions {
   actionMerkleRoot: string;
   initialState: TreeNode | Record<string, unknown>;
 }
@@ -221,7 +221,7 @@ interface SlotMachineOptions {
 
 ### Usage Example
 ```typescript
-const slotMachine = withSlotMachineLayer(myPuzzle, {
+const statefulPuzzle = withStateManagementLayer(myPuzzle, {
   actionMerkleRoot: calculateActionMerkleRoot(actions),
   initialState: {
     balance: 1000,

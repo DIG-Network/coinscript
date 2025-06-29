@@ -1,6 +1,6 @@
 # ChiaLisp Validity Guide
 
-This guide documents the valid ChiaLisp patterns used by the Chia Puzzle Framework, based on analysis of Yakuhito's slot-machine patterns and standard ChiaLisp conventions.
+This guide documents the valid ChiaLisp patterns used by the Chia Puzzle Framework, based on analysis of standard ChiaLisp conventions and best practices.
 
 ## Key Patterns
 

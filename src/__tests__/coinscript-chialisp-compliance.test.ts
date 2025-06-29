@@ -189,9 +189,9 @@ describe('CoinScript ChiaLisp Pattern Compliance', () => {
       expect(chialisp).toMatch(/current_state|state|0x00000|finalizer/); // Various state representations
     });
     
-    test('handles stateful actions with slot machine pattern', () => {
+    test('handles stateful actions with state management pattern', () => {
       const source = `
-        coin SlotMachineCoin {
+        coin StatefulCoin {
           state {
             uint256 value;
           }

@@ -377,7 +377,7 @@ The primary puzzle with all layers applied
 For singleton coins, creates the launcher
 
 ### Action Puzzles
-For `@stateful` actions in slot machine pattern
+For `@stateful` actions in state management layer
 
 ### Inner Puzzles
 For `@inner_puzzle` decorated actions
