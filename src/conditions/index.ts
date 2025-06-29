@@ -40,6 +40,10 @@ export {
   MessageMode
 } from './messages';
 
+// Re-export common announcement functions with shorter names
+export { createCoinAnnouncement as createAnnouncement } from './messages';
+export { assertCoinAnnouncement as assertAnnouncement } from './messages';
+
 // Export all from signature conditions
 export {
   // Types

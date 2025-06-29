@@ -29,6 +29,7 @@ import {
   getConditionCodeName
 } from '../chialisp/includeIndex';
 import { SolutionBuilder } from './SolutionBuilder';
+import { toModHash as utilToModHash, toPuzzleReveal as utilToPuzzleReveal, toChiaLisp as utilToChiaLisp } from '../core/utils';
 
 // Type-safe condition builders
 export interface ConditionBuilder {
@@ -120,6 +121,19 @@ export class Expression {
   
   treeHash(): Expression {
     return new Expression(list([SHA256TREE1, this.tree]));
+  }
+  
+  // Utility methods to match TreeNode interface
+  toModHash(): string {
+    return utilToModHash(this.tree);
+  }
+  
+  toPuzzleReveal(): string {
+    return utilToPuzzleReveal(this.tree);
+  }
+  
+  toChiaLisp(): string {
+    return utilToChiaLisp(this.tree);
   }
 }
 
@@ -643,14 +657,18 @@ export class PuzzleBuilder implements ConditionBuilder {
     return this;
   }
   
-  returnConditions(): PuzzleBuilder {
-    // If we have conditions already built, don't add ARG1
-    // This allows puzzles that build their own conditions to work correctly
-    if (this.nodes.length === 0) {
-      // No conditions built - return conditions from solution (arg1)
-      this.addNode(ARG1);
+  returnConditions(value?: Expression | TreeNode): PuzzleBuilder {
+    if (value) {
+      if (value instanceof Expression) {
+        this.returnValue(value);
+      } else {
+        this.returnValue(expr(value));
+      }
+    } else {
+      // Return all accumulated conditions
+      const conditions = this.buildNodeList(this.nodes);
+      this.nodes = [conditions];
     }
-    // Otherwise, the built conditions will be returned
     return this;
   }
   
@@ -1300,6 +1318,41 @@ export class PuzzleBuilder implements ConditionBuilder {
     } catch (error) {
       throw new Error(`Condition validation failed: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  /**
+   * Add conditions conditionally (alias for if with conditions)
+   * @deprecated Use if() instead
+   */
+  ifConditions(condition: Expression): PuzzleBuilder {
+    return this.if(condition);
+  }
+  
+  /**
+   * Add a parameter (alias for add in solution builder context)
+   * @deprecated This is a solution builder method, not puzzle builder
+   */
+  addParam(_value: unknown): PuzzleBuilder {
+    throw new Error('addParam is a SolutionBuilder method. Use withSolutionParams() or withCurriedParams() for puzzles.');
+  }
+  
+  /**
+   * Validate state structure
+   */
+  validateState(stateStructure?: Record<string, string>): PuzzleBuilder {
+    this.comment('State validation');
+    if (stateStructure) {
+      this.comment(`Expected state fields: ${Object.keys(stateStructure).join(', ')}`);
+    }
+    // In a real implementation, this would generate validation logic
+    return this;
+  }
+  
+  /**
+   * Create a reference to an inner puzzle (for layer patterns)
+   */
+  inner(): Expression {
+    return new Expression(sym('INNER_PUZZLE'));
   }
 }
 

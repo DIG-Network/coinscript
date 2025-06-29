@@ -103,18 +103,27 @@ export class SolutionBuilder {
   
   /**
    * Add a raw value to the solution
+   * Can accept multiple values at once for convenience
    */
-  add(value: string | number | bigint | Uint8Array | TreeNode | SolutionBuilder | boolean): SolutionBuilder {
-    this.nodes.push(toTree(value));
+  add(...values: Array<string | number | bigint | Uint8Array | TreeNode | SolutionBuilder | boolean>): SolutionBuilder {
+    if (values.length === 0) return this;
+    
+    // If single value, add it directly
+    if (values.length === 1) {
+      this.nodes.push(toTree(values[0]));
+    } else {
+      // If multiple values, add each one
+      values.forEach(v => this.nodes.push(toTree(v)));
+    }
     return this;
   }
   
   /**
    * Add multiple values at once
+   * @deprecated Use add() which now accepts multiple values
    */
   addMany(...values: Array<string | number | bigint | Uint8Array | TreeNode | boolean>): SolutionBuilder {
-    values.forEach(v => this.add(v));
-    return this;
+    return this.add(...values);
   }
   
   /**

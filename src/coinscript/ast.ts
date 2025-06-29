@@ -112,6 +112,9 @@ export interface ExpressionStatement extends Statement {
 // Expressions
 export interface Expression extends ASTNode {
   // Base interface for expressions
+  toModHash?(): string;
+  toPuzzleReveal?(): string;
+  toChiaLisp?(): string;
 }
 
 export interface BinaryExpression extends Expression {

@@ -12,13 +12,21 @@ import { sha256 } from '../operators/crypto';
 /**
  * Type aliases
  */
-export type AnnouncementMessage = Uint8Array | string;
-export type AnnouncementId = Uint8Array | string;
+export type AnnouncementMessage = Uint8Array | string | TreeNode | { tree: TreeNode };
+export type AnnouncementId = Uint8Array | string | TreeNode | { tree: TreeNode };
 
 /**
  * Convert announcement message to tree node
  */
 function toAnnouncementNode(value: AnnouncementMessage): TreeNode {
+  // If it's an Expression-like object with a tree property
+  if (typeof value === 'object' && value !== null && 'tree' in value) {
+    return value.tree;
+  }
+  // If it's already a TreeNode
+  if (typeof value === 'object' && value !== null && 'type' in value) {
+    return value;
+  }
   if (typeof value === 'string') {
     // If it looks like hex, treat as hex
     if (value.startsWith('0x') || /^[0-9a-fA-F]+$/.test(value)) {
@@ -27,7 +35,7 @@ function toAnnouncementNode(value: AnnouncementMessage): TreeNode {
     // Otherwise use as symbol
     return sym(value);
   }
-  return hex(Array.from(value).map(b => b.toString(16).padStart(2, '0')).join(''));
+  return hex(Array.from(value as Uint8Array).map(b => b.toString(16).padStart(2, '0')).join(''));
 }
 
 /**

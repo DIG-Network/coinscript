@@ -2,6 +2,7 @@ import { PuzzleBuilder, puzzle, variable, expr } from '../builder/PuzzleBuilder'
 import { TreeNode, list, sym, int, cons, atom } from '../core';
 import { first, rest } from '../operators/lists';
 import { APPLY } from '../core/opcodes';
+import { toModHash } from '../core/utils';
 
 export interface StateManagementOptions {
   actionMerkleRoot: string;
@@ -30,66 +31,39 @@ export interface StateManagementOptions {
  * - State history is preserved through the coin lineage
  */
 export function withStateManagementLayer(
-  _innerPuzzle: PuzzleBuilder,
+  innerPuzzle: PuzzleBuilder,
   options: StateManagementOptions
 ): PuzzleBuilder {
-  console.log('🔍 withStateManagementLayer - imports check:', {
-    PuzzleBuilderType: typeof PuzzleBuilder,
-    PuzzleBuilderName: PuzzleBuilder?.name,
-    puzzleType: typeof puzzle,
-    isFunction: typeof puzzle === 'function',
-    puzzleName: puzzle?.name,
-    puzzleToString: puzzle?.toString?.()?.substring(0, 100)
-  });
-  
   const stateLayer = puzzle();
   
-  console.log('🔍 withStateManagementLayer - stateLayer created:', {
-    type: typeof stateLayer,
-    constructor: stateLayer?.constructor?.name,
-    hasMethod: typeof stateLayer?.toPuzzleReveal === 'function',
-    proto: Object.getPrototypeOf(stateLayer),
-    isInstanceOf: stateLayer instanceof PuzzleBuilder,
-    ownProps: Object.getOwnPropertyNames(stateLayer),
-    protoProps: Object.getOwnPropertyNames(Object.getPrototypeOf(stateLayer)),
-    hasBuildMethod: typeof stateLayer?.build === 'function',
-    hasCommentMethod: typeof stateLayer?.comment === 'function',
-    hasToPuzzleReveal: 'toPuzzleReveal' in stateLayer,
-    protoHasToPuzzleReveal: 'toPuzzleReveal' in Object.getPrototypeOf(stateLayer)
-  });
-  
   stateLayer.comment('=== STATE MANAGEMENT LAYER ===');
-  console.log('🔍 After comment 1:', { hasMethod: typeof stateLayer?.toPuzzleReveal === 'function' });
-  
   stateLayer.comment('Implements state persistence via coin recreation');
-  console.log('🔍 After comment 2:', { hasMethod: typeof stateLayer?.toPuzzleReveal === 'function' });
   
   // Include necessary libraries
   stateLayer.include('condition_codes.clib');
-  console.log('🔍 After include 1:', { hasMethod: typeof stateLayer?.toPuzzleReveal === 'function' });
-  
   stateLayer.include('curry-and-treehash.clinc');
-  console.log('🔍 After include 2:', { hasMethod: typeof stateLayer?.toPuzzleReveal === 'function' });
   // Note: sha256tree is already included in curry-and-treehash.clinc
   
   // Solution parameters: the action to execute and its parameters
   stateLayer.withSolutionParams('ACTION', 'action_solution');
-  console.log('🔍 After withSolutionParams:', { hasMethod: typeof stateLayer?.toPuzzleReveal === 'function' });
+  
+  // Calculate the module hash if not provided
+  let moduleHash = options.moduleHash;
+  if (!moduleHash) {
+    // Build the inner puzzle to get its tree and calculate hash
+    const innerTree = innerPuzzle.build();
+    moduleHash = toModHash(innerTree);
+  }
   
   // Curry in the action merkle root, module hash, and current state
   // Following the pattern: (MOD_HASH STATE ...)
   const curriedParams: Record<string, string | TreeNode> = {
     ACTION_MERKLE_ROOT: options.actionMerkleRoot,
+    MODULE_HASH: moduleHash,  // Use calculated or provided module hash
     STATE: options.initialState  // Current state curried into puzzle
   };
   
-  // If module hash is provided, curry it in, otherwise it needs to be calculated
-  if (options.moduleHash) {
-    curriedParams.MODULE_HASH = options.moduleHash;
-  }
-  
   stateLayer.withCurriedParams(curriedParams);
-  console.log('🔍 After withCurriedParams:', { hasMethod: typeof stateLayer?.toPuzzleReveal === 'function' });
   
   // Build the complete state management expression
   stateLayer.comment('Execute stateful action and apply finalizer');
@@ -106,48 +80,23 @@ export function withStateManagementLayer(
   
   // Get or create finalizer
   const finalizer = options.finalizer || createDefaultFinalizer();
-  console.log('🔍 After finalizer creation:', { hasMethod: typeof stateLayer?.toPuzzleReveal === 'function' });
   
   // Build the complete expression that:
   // 1. Calls the action to get (new_state . conditions)
   // 2. Passes the result to the finalizer
   // Finalizer receives: (MODULE_HASH new_state conditions)
-  // If MODULE_HASH wasn't provided, we need to pass the ACTION_MERKLE_ROOT
-  // which represents the hash of the inner puzzle
-  const moduleHashParam = options.moduleHash 
-    ? variable('MODULE_HASH').tree
-    : variable('ACTION_MERKLE_ROOT').tree;
-    
   const completeExpression = list([
     APPLY,
     finalizer.build(),
     list([
-      moduleHashParam,  // Module hash for recreating the puzzle
+      variable('MODULE_HASH').tree,  // Use the calculated module hash
       first(actionCall),  // new_state from action result
       rest(actionCall)    // conditions from action result
     ])
   ]);
-  console.log('🔍 Before returnValue:', { hasMethod: typeof stateLayer?.toPuzzleReveal === 'function' });
   
   // Return the complete expression
   stateLayer.returnValue(expr(completeExpression));
-  console.log('🔍 After returnValue:', { hasMethod: typeof stateLayer?.toPuzzleReveal === 'function' });
-  
-  console.log('🔍 withStateManagementLayer - returning stateLayer:', {
-    type: typeof stateLayer,
-    constructor: stateLayer?.constructor?.name,
-    hasMethod: typeof stateLayer?.toPuzzleReveal === 'function',
-    proto: Object.getPrototypeOf(stateLayer)
-  });
-  
-  // More debug - check if the prototype is getting lost
-  const checkProto = stateLayer;
-  console.log('🔍 FINAL CHECK before return:', {
-    isInstanceOf: checkProto instanceof PuzzleBuilder,
-    hasToPuzzleReveal: 'toPuzzleReveal' in checkProto,
-    hasMethod: typeof checkProto?.toPuzzleReveal === 'function',
-    protoChain: Object.getPrototypeOf(checkProto)?.constructor?.name
-  });
   
   return stateLayer;
 }
