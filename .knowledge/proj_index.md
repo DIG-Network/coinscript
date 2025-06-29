@@ -183,6 +183,27 @@ The Chia Puzzle Framework is a comprehensive TypeScript framework for building s
 - Tree operations (atom, list, etc.)
 - CoinScript compiler
 - Layer composers
+- TreeNode extensions (toModHash, toPuzzleReveal, toChiaLisp)
+```
+
+### PuzzleBuilder Enhanced API
+```typescript
+- toPuzzleReveal(): string - Get compiled hex for spend bundles
+- toChiaLisp(): string - Convert to ChiaLisp source
+- toCLVM(): string - Get compiled CLVM hex
+- toModHash(): string - Calculate puzzle hash
+- toUnsignedSpendBundle(): object - Create unsigned spend bundle
+- simulateSpend(): object - Simulate puzzle spending
+- inner(): this - Create INNER_PUZZLE reference
+- ifConditions(): this - Deprecated alias for if()
+- validateState(): this - Document state validation
+- returnConditions(expr?: Expression): this - Return conditions
+```
+
+### SolutionBuilder Enhanced API
+```typescript
+- add(...values: Value[]): this - Add multiple values at once
+- addMany(values: Value[]): this - Deprecated, use add()
 ```
 
 ### Internal APIs
@@ -190,12 +211,14 @@ The Chia Puzzle Framework is a comprehensive TypeScript framework for building s
 - AST operations (coinscript module)
 - State management (runtime module)
 - Puzzle composition (layers module)
+- Inner puzzle pattern support
 
 ## Data Flow
 
 1. **CoinScript → AST → PuzzleBuilder → TreeNode → Serialized**
 2. **ChiaLisp → TreeNode → PuzzleBuilder → Enhanced Puzzle**
 3. **Layers → Wrapped Puzzles → Composed Functionality**
+4. **Inner Puzzles → Layer Integration → Complete Contracts**
 
 ## Module Dependencies Graph
 
@@ -241,3 +264,27 @@ index.ts
   - `clvm-lib` for CLVM operations
   - `@dignetwork/datalayer-driver` for simulator
   - Standard crypto libraries 
+
+## Recent Major Updates (2024-12-30)
+
+### Inner Puzzle Pattern Support
+- Added INNER_PUZZLE token to tokenizer
+- Created InnerPuzzleExpression AST node
+- Updated parser to handle inner puzzle syntax
+- Modified state management layer for inner puzzle calls
+- Comprehensive test coverage for layer compositions
+
+### Critical Gap Implementations
+- TreeNode/Expression API extensions (toModHash, toPuzzleReveal, toChiaLisp)
+- SolutionBuilder multi-value support
+- Announcement function type flexibility
+- Dynamic MOD_HASH calculation in state management
+- Complete PuzzleBuilder API compatibility
+- Full inner puzzle pattern implementation
+
+### State Management Enhancements
+- Proper state field indexing and access
+- State modification tracking during actions
+- Dynamic puzzle hash calculation
+- CREATE_COIN generation for state persistence
+- Full ChiaLisp state pattern compliance 
