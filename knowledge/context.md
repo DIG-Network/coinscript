@@ -391,4 +391,69 @@ index.ts
 5. **Debugging Support**: Step-through execution
 6. **IDE Integration**: Language server protocol
 
+## State Management System
+
+### Overview
+The Chia Puzzle Framework implements a sophisticated state management system that enables smart contracts to maintain persistent state across blockchain transactions. This is achieved through a combination of the CoinScript language features and the underlying ChiaLisp state machine pattern.
+
+### Key Components
+
+1. **State Declaration**
+   - State variables are declared in the `state {}` block
+   - Supports all primitive types: uint256, address, string, bool
+   - State is mutable within actions but persisted across spends
+
+2. **Stateful Actions**
+   - Actions marked with `@stateful` decorator have access to state
+   - State transitions are validated according to contract rules
+   - Each action can modify state and trigger coin recreation
+
+3. **State Persistence Mechanism**
+   - State is encoded as part of the solution when spending
+   - `recreateSelf()` creates a new coin with updated state
+   - Each state change creates a new block entry
+   - Complete history preserved on blockchain
+
+4. **Security Features**
+   - Access control via `require()` statements
+   - State validation before transitions
+   - Atomic state updates (all or nothing)
+   - Rate limiting and balance checks
+
+### Implementation Details
+
+The state management system uses:
+- **Merkle Trees**: For efficient state representation
+- **Action Routing**: If/else chains for action dispatch
+- **Solution Encoding**: State passed as solution parameters
+- **Coin Recreation**: CREATE_COIN conditions with state updates
+
+### Real-World Applications
+
+1. **DeFi Protocols**: AMMs, lending pools, yield farming
+2. **Gaming**: Character progression, inventories, tournaments
+3. **Governance**: Voting, treasury management, delegation
+4. **NFTs**: Dynamic metadata, breeding, staking
+5. **Supply Chain**: Multi-stage tracking, approvals
+
+### Example Usage
+
+```typescript
+coin StatefulContract {
+  storage address owner = 0x...;
+  
+  state {
+    uint256 counter;
+    address lastUser;
+  }
+  
+  @stateful
+  action increment() {
+    state.counter += 1;
+    state.lastUser = msg.sender;
+    recreateSelf();
+  }
+}
+```
+
 This architecture provides a solid foundation for building complex Chia smart contracts while maintaining flexibility, type safety, and composability throughout the stack. 
